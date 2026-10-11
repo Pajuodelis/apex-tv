@@ -41,5 +41,15 @@
       result.push({id:id,title:clean(channel.title,120)||'F1 kamera '+(result.length+1),type:clean(channel.type,60),default:channel.default===true});
     }return result;
   }
-  return {audioId:audioId,audioTracks:audioTracks,selectAudio:selectAudio,channels:channels,language:language,languageName:languageName};
+  function commentaryTitle(title){
+    var value=clean(title,120).replace(/[_-]+/g,' ').replace(/\s+/g,' ').toUpperCase();
+    if(/^F1\s*LIVE$/.test(value))return 'F1 Live';
+    if(/^(?:F1\s+)?INTERNATIONAL$/.test(value))return 'International';
+    return '';
+  }
+  function isCommentary(channel){return Boolean(channel&&!/^(obc|ob|onboard)$/i.test(channel.type)&&commentaryTitle(channel.title));}
+  function commentaryChannels(data){return channels(data).filter(isCommentary).map(function(channel){channel.title=commentaryTitle(channel.title);return channel;});}
+  function defaultCommentary(data){return commentaryChannels(data).filter(function(channel){return channel.title==='F1 Live';})[0]||null;}
+  function cameraChannels(data){return channels(data).filter(function(channel){return !isCommentary(channel);});}
+  return {defaultCommentary:defaultCommentary,commentaryTitle:commentaryTitle,isCommentary:isCommentary,commentaryChannels:commentaryChannels,cameraChannels:cameraChannels,audioId:audioId,audioTracks:audioTracks,selectAudio:selectAudio,channels:channels,language:language,languageName:languageName};
 }));

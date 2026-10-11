@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.5.5 — default F1 Live, audio choices and fullscreen controls
+
+- Selects service-provided F1 Live by default for a new main session, even if the
+  provider marks International as its default. English / International remains
+  a manual Audio choice. Explicit driver POV and other manual views are kept.
+- Moved service-provided F1 Live and International feeds into Language / audio.
+  Camera choices contain driver POV, tracker and data views. Audio languages
+  remain tied to the currently selected authorized F1 stream.
+- Back closes a selection dialog, then hides player controls without stopping
+  playback; a further press returns to the menu. Hidden paused controls stay
+  hidden until explicitly reopened. Updated English and Lithuanian help text.
+- Added Home, audio, settings and language screenshots to the README, with
+  direct links to the TV package, source archive and installation instructions.
+- Preserved native AVPlay preparation, encrypted media handling, normal DRM,
+  update signing identity and the installed Samsung Home icon.
+- The main Singapore Grand Prix LIVE picture and sound were confirmed on the
+  physical UE55AU7092 using the previous 0.5.2 player; endurance/key rotation
+  remain separate observations. 182 public-source tests pass.
+
 ## 0.5.3 — first open-source package, English and Lithuanian
 
 - Published the editable TV UI/player and optional companion source under MIT.

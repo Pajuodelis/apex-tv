@@ -10,6 +10,20 @@ The choice is saved on the TV and does not change the commentary language.
 [Installation in Lithuanian](INSTALL-LT.md) ·
 [Android / Windows / Mac / Linux installer](https://github.com/Apps2Samsung/Apps2Samsung/releases/latest)
 
+## Screenshots
+
+Screens captured from the English 0.5.5 interface preview using sample data.
+They contain no account credentials or race footage. The player image shows
+its controls and commentary choices; playback verification is described below.
+
+| Home | Language / audio |
+| --- | --- |
+| ![Apex TV Home](docs/screenshots/home-en.jpg) | ![F1 Live and manual International commentary](docs/screenshots/audio-en.jpg) |
+| Settings | English / Lithuanian |
+| ![Apex TV Settings](docs/screenshots/settings-en.jpg) | ![Choose the app language](docs/screenshots/language-en.jpg) |
+
+[Download the TV app and source](DOWNLOADS.md).
+
 ## Install — easiest available route
 
 Use the separate open-source **Apps2Samsung** installer. It supports Android
@@ -48,8 +62,9 @@ package updates can use the same author certificate.
 
 - Standalone TV login, archive, weekend view, and official live catalogue.
 - Native Samsung AVPlay with ordinary Widevine license requests.
-- Driver cameras, commentary/language selection when provided by F1.
-- Highest compatible video quality, remote control navigation and playback.
+- Driver POV, tracker and data views under Cameras; F1 Live / International and available languages under Audio.
+- F1 Live commentary is selected by default when supplied for the session. Choose English / International manually under Audio.
+- Highest compatible video quality and remote navigation. Back hides player controls first; another press returns to the menu.
 - Resume, favorites, search, playback diagnostics, and signed menu updates.
 - Apple TV-inspired layout, light focus animation, and TV performance tuning.
 - English/Lithuanian menus, player controls, sign-in, and error messages.
@@ -57,12 +72,12 @@ package updates can use the same author certificate.
 ## Compatibility and what has actually been tested
 
 **Tested on Samsung UE55AU7092, Tizen 6.0 (2021)** with moving picture and
-sound: main qualifying, main sprint, and a genuine live pre-race studio feed.
+sound: main qualifying, main sprint, a genuine live pre-race studio feed, and the main 2026 Singapore Grand Prix live broadcast.
 The TV fetched its own media and DRM licenses. Archive playback was also
 confirmed after the companion server was stopped.
 
-**A full live Grand Prix and long-session key rotation are not yet certified.**
-Do not interpret a working replay or studio feed as proof of every live race.
+**Main-race moving picture and sound were confirmed on 11 October 2026.** Long-session stability and actual license/key rotation still require separate observation.
+A successful broadcast on this TV does not establish support for every live race or Samsung model.
 The repository is an initial community release, not a guarantee of support
 for all Samsung models. Tizen 6.0 or later is required by the package; other
 models, subscription tiers, and regions need their own tests.

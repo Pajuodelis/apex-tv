@@ -2,6 +2,13 @@
 (function(root,factory){var api=factory(root);if(typeof module==='object'&&module.exports)module.exports=api;else root.ApexI18n=api;}(typeof window!=='undefined'?window:globalThis,function(root){
   'use strict';
   var EN={
+  "Rasta:": "Found:",
+  "Sustabdyti vaizdą": "Pause playback",
+  "F1 Live pasirenkamas automatiškai. International ir kitas kalbas gali pasirinkti ranka. Pakeitimas gali užtrukti kelias sekundes.": "F1 Live is selected automatically. Choose International or another language manually. Switching can take a few seconds.",
+  "F1 Live ir International yra komentavimo transliacijos. Kalbos pateiktos šiuo metu pasirinktam srautui. Pakeitimas gali užtrukti kelias sekundes.": "F1 Live and International are commentary feeds. Languages belong to the currently selected stream. Switching can take a few seconds.",
+  "Komentavimo kanalų nepavyko gauti. Esamo srauto garso takelius gali pasirinkti.": "Commentary feeds could not be loaded. You can still choose audio tracks from the current stream.",
+  "OK / ⏯ – pauzė · ↑ – valdikliai · Atgal – paslėpti / meniu": "OK / ⏯ – pause · ↑ – controls · Back – hide / menu",
+  "Rodyklės pasirenka kortelę, OK ją atidaro. Atgal grąžina į ankstesnį ekraną. Grotuve Atgal pirmiausia paslepia valdiklius, kitas paspaudimas grąžina į meniu. OK sustabdo arba tęsia vaizdą; kairė / dešinė persuka 10 sek. Aukštyn atveria valdiklius. Šoninis meniu atveriamas kairėn arba Atgal Pradžioje. Paieška ieško visame F1 archyve. LIVE galima atsukti tik F1 pateikiamame laiko lange. Eterio mygtukas grąžina į dabartinę transliaciją.": "Use arrows to choose a card and OK to open it. Back returns to the previous screen. In the player, Back hides controls first; another press returns to the menu. OK pauses or resumes; left / right seeks 10 seconds. Up opens controls. Left or Back on Home opens the sidebar. Search covers the entire F1 archive. LIVE seeking is limited to the window provided by F1. The Live button returns to the current broadcast.",
   "Kalba": "Language",
   "Ryšys: TV tiesiogiai su F1": "Connection: TV directly to F1",
   "iš": "of",

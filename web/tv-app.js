@@ -184,7 +184,7 @@ window.ApexProtectionProbe = {
   var ctx = window.APEX_CONTEXT, root = document.getElementById('app');
   ctx.testCompanion = false;
   var stack = [], current = { tab: 'home', title: 'Pradžia' }, account = null;
-  var pendingRequest = 0, playing = false, epoch = 0, playbackKind = '', hideTimer = 0, tracks = [];
+  var pendingRequest = 0, playing = false, epoch = 0, playbackKind = '', hideTimer = 0, overlayDismissed = false, tracks = [];
   var nativePlayer = window.webapis && webapis.avplay;
   var browserPlayer = null, activeEngine = '', prepareTimer = 0, localRelay = null;
   var commandBusy = false, lastCommand = '';
@@ -389,7 +389,7 @@ window.ApexProtectionProbe = {
     (modal.querySelector('[data-modal-default]') || modal.querySelector('button')).focus();
   }
   function help() {
-    dialog('Pultelis ir žiūrėjimas', 'Rodyklės pasirenka kortelę, OK ją atidaro. Atgal grąžina į ankstesnį ekraną. Grotuve OK sustabdo arba tęsia vaizdą; kairė / dešinė persuka 10 sek. Aukštyn atveria valdiklius. Šoninis meniu atveriamas kairėn arba Atgal Pradžioje. Paieška ieško visame F1 archyve. LIVE galima atsukti tik F1 pateikiamame laiko lange. Eterio mygtukas grąžina į dabartinę transliaciją.', [{label:'Supratau',default:true}]);
+    dialog('Pultelis ir žiūrėjimas', 'Rodyklės pasirenka kortelę, OK ją atidaro. Atgal grąžina į ankstesnį ekraną. Grotuve Atgal pirmiausia paslepia valdiklius, kitas paspaudimas grąžina į meniu. OK sustabdo arba tęsia vaizdą; kairė / dešinė persuka 10 sek. Aukštyn atveria valdiklius. Šoninis meniu atveriamas kairėn arba Atgal Pradžioje. Paieška ieško visame F1 archyve. LIVE galima atsukti tik F1 pateikiamame laiko lange. Eterio mygtukas grąžina į dabartinę transliaciją.', [{label:'Supratau',default:true}]);
   }
   function openItem(raw) {
     var item = UX.item(raw); if (!item) return; cancelRecovery();rememberView();
@@ -1091,7 +1091,7 @@ window.ApexProtectionProbe = {
   }
   function refreshAccount() {request('/api/status').then(function(data){account=data.account;render();}).catch(function(e){error(layout(),e.message,refreshAccount);});}
   function goBack() {
-    cancelRecovery();if(modal){closeModal();return;}if(playing){stopPlayback();return;}if(stack.length){current=stack.pop();render();return;}if(current.tab!=='home'){showTab('home','Pradžia');return;}
+    cancelRecovery();if(modal){closeModal();return;}if(playing){if(!overlay.hidden){hideOverlay();return;}stopPlayback();return;}if(stack.length){current=stack.pop();render();return;}if(current.tab!=='home'){showTab('home','Pradžia');return;}
     var sidebar=root.querySelector('.tv-sidebar');if(sidebar&&!sidebar.contains(document.activeElement)){var chosen=sidebar.querySelector('.selected');current.sidebarReturn=document.activeElement&&document.activeElement.getAttribute('data-focus-key');if(chosen)chosen.focus();return;}
     dialog('Uždaryti Apex TV?','Žiūrėjimo vieta ir nustatymai jau išsaugoti šiame televizoriuje.',[{label:'Likti čia',default:true},{label:'Uždaryti',run:function(){if(window.tizen&&tizen.application)tizen.application.getCurrentApplication().exit();}}]);
   }
@@ -1112,7 +1112,7 @@ window.ApexProtectionProbe = {
     var state=activePlayback,ready=state&&(arguments.length?sample:metrics()),disabled=!ready||viewBusy||seekBusy;
     var chosen=state&&state.audioTracks.filter(function(t){return t.id===state.audioTrackId;})[0],favorite=document.getElementById('player-favorite-driver');
     if(favorite){var preferred=driverStore.get();UI.text(favorite,preferred?'★ '+preferred.name:'★ Lenktynininkas');UI.set(favorite,'disabled',Boolean(disabled));}
-    UI.text(camera,state&&state.channelTitle?'Kamera: '+state.channelTitle.slice(0,28):'Kameros / POV');UI.text(audio,chosen?'Garsas: '+chosen.label.slice(0,32):'Kalba / garsas');
+    var commentary=state&&Views.commentaryTitle(state.channelTitle);UI.text(camera,state&&state.channelTitle&&!commentary?'Kamera: '+state.channelTitle.slice(0,28):'Kameros / POV');UI.text(audio,commentary==='F1 Live'?'Garsas: F1 Live':commentary?'Garsas: '+(chosen?chosen.label.slice(0,20)+' · ':'')+commentary:chosen?'Garsas: '+chosen.label.slice(0,32):'Kalba / garsas');
     var quality=document.getElementById('player-quality');if(quality){UI.text(quality,state&&state.stream&&state.stream.selectedVideo?'Kokybė: '+Quality.label(state.stream.selectedVideo):'Kokybė: '+(state&&state.videoQuality==='720p'?'720p':'geriausia'));UI.set(quality,'disabled',Boolean(disabled));}
     UI.set(camera,'disabled',Boolean(disabled));UI.set(audio,'disabled',Boolean(disabled));
     if(ready&&state.returnFocus&&!viewBusy&&!seekBusy){var focus=document.getElementById(state.returnFocus);state.returnFocus='';if(focus&&!focus.disabled)focus.focus();}
@@ -1127,41 +1127,53 @@ window.ApexProtectionProbe = {
     var route='/api/channels?id='+encodeURIComponent(item.id),cached=catalogueCache.get(route,120000);
     (cached?Promise.resolve({channels:cached.items}):request(route)).then(function(data){
       if(generation!==epoch||current!==view||state!==activePlayback)return;viewBusy=false;updateViewControls();
-      var channels=Views.channels(data);catalogueCache.put(route,channels);driverStore.observe(channels);var selected=state?state.channelId:current.channelId||'';
-      if(!channels.length){dialog('Kameros / POV','Šiam įrašui ar transliacijai F1 papildomų kamerų nepateikė.',[{label:'Grįžti',default:true}]);return;}
-      var choices=[{label:'Grįžti',default:true},{label:(selected?'':'✓ ')+'Pagrindinė transliacija',run:function(){choose('','');}}];
-      choices.push({label:'★ Pasirinkti mėgstamą lenktynininką',run:function(){chooseFavoriteDriver(channels);}});
+      var allChannels=Views.channels(data),channels=Views.cameraChannels({channels:allChannels}),mainChannel=Views.commentaryChannels({channels:allChannels}).filter(function(channel){return channel.id===(state?state.channelId:current.channelId);})[0]||Views.defaultCommentary({channels:allChannels})||Views.commentaryChannels({channels:allChannels}).filter(function(channel){return channel.default;})[0]||Views.commentaryChannels({channels:allChannels})[0];catalogueCache.put(route,allChannels);driverStore.observe(channels);var selected=state?state.channelId:current.channelId||'',selectedTitle=state?state.channelTitle:current.channelTitle||'';
+      if(!channels.length&&!mainChannel){dialog('Kameros / POV','Šiam įrašui ar transliacijai F1 papildomų kamerų nepateikė.',[{label:'Grįžti',default:true}]);return;}
+      var choices=[{label:'Grįžti',default:true},{label:(!selected||Views.commentaryTitle(selectedTitle)?'✓ ':'')+'Pagrindinė transliacija',run:function(){choose(mainChannel?mainChannel.id:'',mainChannel?mainChannel.title:'');}}];
+      if(channels.some(function(channel){return Drivers.driver(channel);}))choices.push({label:'★ Pasirinkti mėgstamą lenktynininką',run:function(){chooseFavoriteDriver(channels);}});
       channels.forEach(function(channel){var title=/^(obc|ob|onboard)$/i.test(channel.type)&&!/pov|onboard/i.test(channel.title)?'POV · '+channel.title:channel.title;choices.push({label:(selected===channel.id?'✓ ':'')+title,run:function(){choose(channel.id,title);}});});
       function choose(id,title){if(fromPlayer){if(id!==state.channelId)changeView({channelId:id,channelTitle:title});}else{current.channelId=id;current.channelTitle=title;render();}}
       dialog('Pasirink kamerą','Pasirinktas F1 vaizdas bus rodomas visame ekrane. Įraše išlaikysime žiūrėjimo vietą.',choices);
     }).catch(function(e){if(generation!==epoch||current!==view)return;viewBusy=false;updateViewControls();dialog('Kamerų sąrašas nepasiekiamas',String(e.message||'Bandyk dar kartą.'),[{label:'Grįžti',default:true},{label:'Bandyti dar kartą',run:selectCamera}]);});
   }
   function selectAudio() {
-    if(!activePlayback||viewBusy||seekBusy)return;var state=activePlayback;
-    var choices=[{label:'Grįžti',default:true}];state.audioTracks.forEach(function(track){choices.push({label:(track.id===state.audioTrackId?'✓ ':'')+track.label,run:function(){if(track.id!==state.audioTrackId)changeView({audioTrackId:track.id});}});});
-    dialog('Kalba ir garsas',state.audioTracks.length>1?'Rodomos tik šio F1 srauto pateikiamos kalbos ir garso takeliai. Pakeitimas gali užtrukti kelias sekundes.':state.audioTracks.length===1?'Šiam F1 srautui pateiktas vienas TV tinkamas garso takelis.':'Šio srauto garso pasirinkimas neprieinamas.',choices);
+    if(!activePlayback||viewBusy||seekBusy)return;var state=activePlayback,view=current,generation=epoch;
+    var route='/api/channels?id='+encodeURIComponent(state.item.id),cached=catalogueCache.get(route,120000);
+    viewBusy=true;updateViewControls();showOverlay();
+    function showChoices(data,message){
+      if(generation!==epoch||current!==view||state!==activePlayback)return;viewBusy=false;updateViewControls();
+      var channels=Views.channels(data);if(!message)catalogueCache.put(route,channels);
+      var commentaries=Views.commentaryChannels({channels:channels}),choices=[{label:'Grįžti',default:true}],chosen=state.audioTracks.filter(function(track){return track.id===state.audioTrackId;})[0],international=commentaries.some(function(channel){return channel.title==='International';}),liveSelected=Views.commentaryTitle(state.channelTitle)==='F1 Live';
+      commentaries.forEach(function(channel){var selected=(state.channelId===channel.id||!state.channelId&&channel.default)&&(channel.title!=='International'||!chosen||/^(eng|en)$/.test(chosen.language));
+        choices.push({label:(selected?'✓ ':'')+(channel.title==='International'?'Anglų · International':channel.title),run:function(){if(!selected)changeView({channelId:channel.id,channelTitle:channel.title,audioLanguage:'eng',commentary:true});}});
+      });
+      state.audioTracks.forEach(function(track){if(commentaries.length&&liveSelected||international&&Views.commentaryTitle(state.channelTitle)&&/^(eng|en)$/.test(track.language))return;choices.push({label:(track.id===state.audioTrackId?'✓ ':'')+track.label,run:function(){if(track.id!==state.audioTrackId)changeView({audioTrackId:track.id});}});});
+      if(message)choices.push({label:'Bandyti dar kartą',run:selectAudio});
+      dialog('Kalba ir garsas',message?'Komentavimo kanalų nepavyko gauti. Esamo srauto garso takelius gali pasirinkti.':commentaries.length?'F1 Live pasirenkamas automatiškai. International ir kitas kalbas gali pasirinkti ranka. Pakeitimas gali užtrukti kelias sekundes.':state.audioTracks.length?'Rodomos tik šio F1 srauto pateikiamos kalbos ir garso takeliai. Pakeitimas gali užtrukti kelias sekundes.':'Šio srauto garso pasirinkimas neprieinamas.',choices);
+    }
+    (cached?Promise.resolve({channels:cached.items}):request(route)).then(function(data){showChoices(data,'');}).catch(function(){showChoices({channels:cached?cached.items:[]},'unavailable');});
   }
   function selectQuality(){if(!activePlayback||viewBusy||seekBusy)return;var state=activePlayback;dialog('Vaizdo kokybė',state.stream.selectedVideo?'Pasirinktas srautas: '+Quality.label(state.stream.selectedVideo)+'. Keičiant kokybę vaizdas trumpam perkraunamas.':'Aukščiausia F1 pateikta suderinama kokybė. Keičiant kokybę vaizdas trumpam perkraunamas.',[{label:'Grįžti',default:true},{label:(state.videoQuality==='best'?'✓ ':'')+'Geriausia · iki 1080p',run:function(){if(state.videoQuality!=='best')changeView({videoQuality:'best'});}},{label:(state.videoQuality==='720p'?'✓ ':'')+'720p · mažiau duomenų',run:function(){if(state.videoQuality!=='720p')changeView({videoQuality:'720p'});}}]);}
   function changeView(options) {
     if(!playing||!activePlayback||viewBusy||seekBusy)return;var previous=activePlayback,generation=epoch;
     var channelId=options.channelId===undefined?previous.channelId:options.channelId,channelTitle=options.channelTitle===undefined?previous.channelTitle:options.channelTitle;
-    viewBusy=true;updateViewControls();showOverlay();I18n.setText(document.getElementById('player-state'), options.videoQuality?'Keičiama kokybė…':options.audioTrackId?'Keičiamas garsas…':'Keičiama kamera…');
+    viewBusy=true;updateViewControls();showOverlay();I18n.setText(document.getElementById('player-state'), options.videoQuality?'Keičiama kokybė…':(options.audioTrackId||options.commentary)?'Keičiamas garsas…':'Keičiama kamera…');
     // A language change reuses the authorised, channel-bound TV manifest and licence ticket.
     // Only changing the camera requests another service-validated channel.
     var qualityMode=Quality.mode(options.videoQuality||previous.videoQuality||preferredQuality);
     var source=(options.audioTrackId||options.videoQuality)&&ctx.standalone&&previous.stream.manifestXML?Promise.resolve(Object.assign({},previous.stream,{audioTrackId:options.audioTrackId||previous.audioTrackId,videoQuality:qualityMode})):
-      request('/api/play','POST',{id:previous.item.id,channelId:channelId,audioTrackId:options.audioTrackId||(options.videoQuality?previous.audioTrackId:'')||'',audioLanguage:preferredAudioLanguage,videoQuality:qualityMode,platform:previous.compatibilityStart?'WEB_HLS':undefined,relay:Boolean(previous.compatibilityStart)});
+      request('/api/play','POST',{id:previous.item.id,channelId:channelId,audioTrackId:options.audioTrackId||(options.videoQuality?previous.audioTrackId:'')||'',audioLanguage:options.audioLanguage||preferredAudioLanguage,videoQuality:qualityMode,platform:previous.compatibilityStart?'WEB_HLS':undefined,relay:Boolean(previous.compatibilityStart)});
     source.then(function(stream){
       if(generation!==epoch||activePlayback!==previous)return;viewBusy=false;if(document.hidden)return;
       var m=metrics()||lastMetrics||{position:previous.resumeAt,paused:false},next=prepareViewPlayback(previous.item,stream,previous.compatibilityStart,previous.item.live?0:m.position,{channelId:channelId,channelTitle:channelTitle,audioTrackId:options.audioTrackId||(options.videoQuality?previous.audioTrackId:undefined),videoQuality:qualityMode});
-      next.restoreAfterSwitch=true;next.pausedAtStart=m.paused;next.returnFocus=options.automatic?'':options.videoQuality?'player-quality':options.audioTrackId?'player-audio':'player-camera';var liveBefore=previous.item.live&&getLiveWindow(m.position);next.liveResumeDelay=liveBefore?liveBefore.delay:previous.liveResumeDelay||0;next.bestBandwidth=previous.bestBandwidth;next.bestHeight=previous.bestHeight;stream.compatibilityStart=Boolean(previous.compatibilityStart)&&!stream.relayed&&!stream.nativeTest;
+      next.restoreAfterSwitch=true;next.pausedAtStart=m.paused;next.returnFocus=options.automatic?'':options.videoQuality?'player-quality':(options.audioTrackId||options.commentary)?'player-audio':'player-camera';var liveBefore=previous.item.live&&getLiveWindow(m.position);next.liveResumeDelay=liveBefore?liveBefore.delay:previous.liveResumeDelay||0;next.bestBandwidth=previous.bestBandwidth;next.bestHeight=previous.bestHeight;stream.compatibilityStart=Boolean(previous.compatibilityStart)&&!stream.relayed&&!stream.nativeTest;
       if(current.video&&current.video.id===next.item.id){current.channelId=next.channelId;current.channelTitle=next.channelTitle;}stopPlayback(false,true);activePlayback=next;lastMetrics=null;lastSaved=Date.now();
       if(options.audioTrackId&&next.audioLanguage){preferredAudioLanguage=next.audioLanguage;try{localStorage.setItem('apex-audio-language',preferredAudioLanguage);}catch(_){}}
       if(options.videoQuality&&!options.automatic)saveQuality(qualityMode);
       if(options.videoQuality)playbackHealth.switched(qualityMode,options.automatic===true);
-      diagnostic(options.videoQuality?'quality_changed':options.audioTrackId?'audio_changed':'camera_changed',{engine:options.videoQuality?qualityMode:options.audioTrackId?next.audioLanguage:'channel='+next.channelId});
+      diagnostic(options.videoQuality?'quality_changed':options.audioTrackId?'audio_changed':options.commentary?'commentary_changed':'camera_changed',{engine:options.videoQuality?qualityMode:options.audioTrackId?next.audioLanguage:'channel='+next.channelId});
       begin(stream,viewTitle(next),next.item.live?'live':'vod');updateViewControls();
-      var target=document.getElementById(options.videoQuality?'player-quality':options.audioTrackId?'player-audio':'player-camera');if(target&&!options.automatic)target.focus();
+      var target=document.getElementById(options.videoQuality?'player-quality':(options.audioTrackId||options.commentary)?'player-audio':'player-camera');if(target&&!options.automatic)target.focus();
     }).catch(function(e){if(generation!==epoch||activePlayback!==previous)return;viewBusy=false;updateViewControls();if(options.automatic){playbackHealth.failed(previous.videoQuality,options.videoQuality);diagnostic('automatic_quality_failed',{error:e.message});I18n.setText(document.getElementById('player-state'), 'Tęsiama esama kokybe.');return;}dialog('Pasirinkimo pritaikyti nepavyko',String(e.message||'Bandyk dar kartą.'),[{label:'Tęsti žiūrėjimą',default:true}]);});
   }
   function resetPlayerTimeline(kind) {
@@ -1171,6 +1183,7 @@ window.ApexProtectionProbe = {
   }
   function installPlayerControls() {
     if(document.getElementById('player-timeline'))return;
+    var hint=overlay.querySelector('p:last-child');if(hint)I18n.setText(hint,'OK / ⏯ – pauzė · ↑ – valdikliai · Atgal – paslėpti / meniu');
     var row=node('div','','player-time-row'),elapsed=node('span','0:00');elapsed.id='player-elapsed';row.appendChild(elapsed);
     var bar=node('div','','player-timeline');bar.id='player-timeline';bar.setAttribute('role','progressbar');I18n.attr(bar, 'aria-label', 'Žiūrėjimo progresas');bar.setAttribute('aria-valuemin','0');bar.appendChild(node('span'));row.appendChild(bar);var remaining=node('span','');remaining.id='player-remaining';row.appendChild(remaining);overlay.insertBefore(row,overlay.querySelector('.player-buttons'));
     var buttons=overlay.querySelector('.player-buttons');[['−60 sek.',-60],['−10 sek.',-10],['+10 sek.',10],['+60 sek.',60]].forEach(function(entry){var b=button(entry[0],function(){seek(entry[1]>0,Math.abs(entry[1]));},'seek-button');I18n.attr(b, 'aria-label', (entry[1]>0?'Pirmyn ':'Atgal ')+Math.abs(entry[1])+' sekundžių');buttons.insertBefore(b,document.getElementById('back-menu'));});
@@ -1203,7 +1216,7 @@ window.ApexProtectionProbe = {
     var live=playbackKind==='live',liveRange=live&&typeof getLiveWindow==='function'?getLiveWindow(m.position):null;
     if(live&&activePlayback&&activePlayback.liveResumeDelay>6&&!activePlayback.liveResumeApplied&&liveRange){activePlayback.liveResumeApplied=true;var liveTarget=Math.max(liveRange.start,Math.min(liveRange.edge,liveRange.end-activePlayback.liveResumeDelay));if(activeEngine==='AVPlay'){nativeSeek(liveTarget,function(){restorePause();});return;}video.currentTime=liveTarget;}
     if(restorePause(m))m.paused=true;lastMetrics=m;
-    if(m.paused&&overlay.hidden)showOverlay();
+    if(m.paused&&overlay.hidden&&!overlayDismissed)showOverlay();
     if(!overlay.hidden){
       updateViewControls(m);var pause=document.getElementById('play-pause');UI.text(pause,m.paused?'Tęsti':'Pauzė');UI.attr(pause,'aria-label',m.paused?'Tęsti vaizdą':'Sustabdyti vaizdą');
       var behind=liveRange&&liveRange.delay>6;UI.text(document.getElementById('player-elapsed'),live?(behind?'−'+UX.time(liveRange.delay):'● TIESIOGIAI'):UX.time(m.position));UI.text(document.getElementById('player-remaining'),live?(liveRange?'Nuo eterio':'Tiesioginis vaizdas'):m.duration?'Liko '+UX.time(Math.max(0,m.duration-m.position)):'');
@@ -1212,11 +1225,15 @@ window.ApexProtectionProbe = {
       var edge=document.getElementById('player-live-edge');if(edge){UI.set(edge,'hidden',!live);UI.set(edge,'disabled',viewBusy||seekBusy);}
       if(!viewBusy){var stateLabel=document.getElementById('player-state');if(m.paused)UI.text(stateLabel,'Pristabdyta');else if(stateLabel.textContent===I18n.text('Pristabdyta'))UI.text(stateLabel,'');}
     }
-    if(m.paused)showOverlay();if(Date.now()-lastSaved>10000)savePlayback();if(typeof checkPlaybackHealth==='function')checkPlaybackHealth(m);
+    if(m.paused&&!overlayDismissed)showOverlay();if(Date.now()-lastSaved>10000)savePlayback();if(typeof checkPlaybackHealth==='function')checkPlaybackHealth(m);
   }
 
   function showOverlay() {
-    var entering=overlay.hidden;overlay.hidden=false;if(entering){motion.enter(overlay);if(playing)updatePlayer();}clearTimeout(hideTimer);hideTimer=setTimeout(function(){if(playing&&!modal&&!viewBusy&&!seekBusy&&!(lastMetrics&&lastMetrics.paused)&&!overlay.contains(document.activeElement))overlay.hidden=true;},7000);
+    var entering=overlay.hidden;overlayDismissed=false;overlay.hidden=false;if(entering){motion.enter(overlay);if(playing)updatePlayer();}clearTimeout(hideTimer);hideTimer=setTimeout(function(){if(playing&&!modal&&!viewBusy&&!seekBusy&&!(lastMetrics&&lastMetrics.paused)&&!overlay.contains(document.activeElement))overlay.hidden=true;},7000);
+  }
+  function hideOverlay() {
+    clearTimeout(hideTimer);overlayDismissed=true;overlay.hidden=true;
+    var focused=document.activeElement;if(focused&&overlay.contains(focused)&&focused.blur)focused.blur();
   }
   function toggle() {
     if(!playing||seekBusy||viewBusy)return;try{if(activeEngine==='AVPlay'){var state=nativePlayer.getState();if(state==='PLAYING'){nativePlayer.pause();clearTimeout(prepareTimer);}else if(state==='PAUSED')nativePlayer.play();}else if(video.paused){var promise=video.play();if(promise&&promise.catch)promise.catch(function(){});}else video.pause();}catch(_){}updatePlayer();showOverlay();
@@ -1231,13 +1248,25 @@ window.ApexProtectionProbe = {
     var m=metrics();if(!m||!m.duration)return;var target=UX.seekTarget(m.position,(forward?1:-1)*(amount||10),m.duration);
     if(activeEngine==='AVPlay')nativeSeek(target,function(e){if(!e){lastMetrics.position=target;savePlayback();updatePlayer();}});else try{video.currentTime=target;lastMetrics.position=target;savePlayback();updatePlayer();}catch(_){}
   }
+  function resolveStartView(item,options) {
+    options=options||{};
+    if(options.channelId)return Promise.resolve(Views.commentaryTitle(options.channelTitle)==='F1 Live'?Object.assign({},options,{audioLanguage:'eng'}):options);
+    var route='/api/channels?id='+encodeURIComponent(item.id),cached=catalogueCache.get(route,120000);
+    return (cached?Promise.resolve({channels:cached.items}):request(route)).then(function(data){
+      var channels=Views.channels(data);catalogueCache.put(route,channels);var live=Views.defaultCommentary({channels:channels});
+      return live?Object.assign({},options,{channelId:live.id,channelTitle:live.title,audioLanguage:'eng'}):options;
+    }).catch(function(){return options;});
+  }
   function startContent(raw,compatibilityStart,resumeAt,viewOptions) {
     var item=UX.item(raw);if(!item||root.querySelector('.request-status'))return;cancelRecovery();playbackHealth.reset();
     viewOptions=viewOptions||{channelId:current.video&&current.video.id===item.id?current.channelId||'':'',channelTitle:current.video&&current.video.id===item.id?current.channelTitle||'':''};
     if(!account||!account.signedIn){showTab('settings','Nustatymai');return;}rememberView();clearInterval(liveTimer);
     var main=root.querySelector('main'),status=node('p','Ruošiamas vaizdas…','request-status');status.setAttribute('role','status');main.appendChild(status);var pending=++pendingRequest;
-    request('/api/play','POST',{id:item.id,channelId:viewOptions.channelId||'',audioTrackId:viewOptions.audioTrackId||'',audioLanguage:preferredAudioLanguage,videoQuality:Quality.mode(viewOptions.videoQuality||preferredQuality),platform:compatibilityStart?'WEB_HLS':undefined,relay:Boolean(compatibilityStart)}).then(function(stream){
-      if(pending!==pendingRequest||!document.contains(main))return;status.remove();if(document.hidden)return;if(resumeAt===0&&!item.live&&localStore.get(item.id))localStore.record(item,0,item.duration);stream.compatibilityStart=Boolean(compatibilityStart)&&!stream.relayed&&!stream.nativeTest;activePlayback=prepareViewPlayback(item,stream,compatibilityStart,resumeAt===undefined?UX.resume(localStore.get(item.id)):resumeAt,viewOptions);lastMetrics=null;lastSaved=Date.now();begin(stream,viewTitle(activePlayback),item.live?'live':'vod');updateViewControls();
+    resolveStartView(item,viewOptions).then(function(resolved){
+      if(pending!==pendingRequest||!document.contains(main)||document.hidden)return null;viewOptions=resolved;
+      return request('/api/play','POST',{id:item.id,channelId:viewOptions.channelId||'',audioTrackId:viewOptions.audioTrackId||'',audioLanguage:viewOptions.audioLanguage||preferredAudioLanguage,videoQuality:Quality.mode(viewOptions.videoQuality||preferredQuality),platform:compatibilityStart?'WEB_HLS':undefined,relay:Boolean(compatibilityStart)});
+    }).then(function(stream){
+      if(!stream||pending!==pendingRequest||!document.contains(main))return;status.remove();if(document.hidden)return;if(resumeAt===0&&!item.live&&localStore.get(item.id))localStore.record(item,0,item.duration);stream.compatibilityStart=Boolean(compatibilityStart)&&!stream.relayed&&!stream.nativeTest;activePlayback=prepareViewPlayback(item,stream,compatibilityStart,resumeAt===undefined?UX.resume(localStore.get(item.id)):resumeAt,viewOptions);lastMetrics=null;lastSaved=Date.now();begin(stream,viewTitle(activePlayback),item.live?'live':'vod');updateViewControls();
     }).catch(function(e){if(pending!==pendingRequest||!document.contains(main))return;status.remove();var failed={item:item,compatibilityStart:compatibilityStart,resumeAt:resumeAt||0,channelId:viewOptions.channelId||'',channelTitle:viewOptions.channelTitle||'',audioTrackId:viewOptions.audioTrackId||'',videoQuality:viewOptions.videoQuality||preferredQuality};if(tryRecovery(e.message,failed))return;error(main,e.message,function(){startContent(item,compatibilityStart,resumeAt,viewOptions);});});
   }
   function firstMenuContent() {
