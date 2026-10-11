@@ -1,0 +1,23 @@
+{
+  "name": "apex-tv",
+  "version": "0.5.3",
+  "private": true,
+  "description": "Independent open-source F1 TV client for Samsung Tizen TVs",
+  "main": "companion/main.cjs",
+  "scripts": {
+    "start": "electron .",
+    "test": "node --test tests/*.test.mjs",
+    "prepare-tv": "node tools/build-tv.mjs",
+    "build:tv": "node tools/build-tv.mjs",
+    "check:public": "node tools/check-public.mjs"
+  },
+  "devDependencies": {
+    "electron": "44.7.0",
+    "@xmldom/xmldom": "0.9.12"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Pajuodelis/apex-tv.git"
+  }
+}

@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<widget xmlns="http://www.w3.org/ns/widgets" xmlns:tizen="http://tizen.org/ns/widgets" id="https://github.com/Pajuodelis/apex-tv" version="0.5.3" viewmodes="maximized">
+  <tizen:application id="ApexTv0001.ApexTV" package="ApexTv0001" required_version="6.0"/>
+  <name>Apex TV</name>
+  <content src="index.html"/>
+  <icon src="icon.png"/>
+  <tizen:profile name="tv-samsung"/>
+  <tizen:privilege name="http://tizen.org/privilege/internet"/>
+  <tizen:privilege name="http://tizen.org/privilege/tv.inputdevice"/>
+  <tizen:privilege name="http://developer.samsung.com/privilege/drmplay"/>
+  <tizen:privilege name="http://developer.samsung.com/privilege/productinfo"/>
+  <access origin="*" subdomains="true"/>
+  <tizen:content-security-policy>default-src 'self' http: https:; script-src 'self' http: https: blob:; style-src 'self' http: https: blob:; connect-src http: https:; worker-src 'self' blob:; media-src 'self' http: https: blob:; object-src 'self'; base-uri 'self'</tizen:content-security-policy>
+  <tizen:setting screen-orientation="landscape" context-menu="disable" background-support="disable" encryption="disable" install-location="auto" hwkey-event="enable"/>
+  <tizen:metadata key="http://samsung.com/tv/metadata/prelaunch.support" value="false"/>
+</widget>

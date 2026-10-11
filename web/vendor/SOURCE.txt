@@ -1,0 +1,6 @@
+dash.js 4.7.4, Dash Industry Forum
+Source: https://github.com/Dash-Industry-Forum/dash.js/tree/v4.7.4
+Original bundle: https://cdn.dashjs.org/v4.7.4/dash.all.min.js
+SHA-256: 3a1db51ed00412c16f9edb304db69ac84f1ffce8aa2d61caf4895aa9c9bdf0df
+The original bundle is included unchanged in the signed TV JavaScript update.
+The BSD licence and the bundled contributor notices are included alongside it.
