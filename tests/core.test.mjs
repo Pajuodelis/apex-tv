@@ -65,7 +65,8 @@ test('updates are signed and published assets remain immutable',async(t)=>{
   await fs.writeFile(path.join(scratch,'web/video-quality.js'),'/* video quality fixture */');
   await fs.writeFile(path.join(scratch,'web/tv-app.js'),'version one');
   await fs.writeFile(path.join(scratch,'web/tv.css'),'body{}');
-  const added=['i18n.js','ui-performance.js','discovery.js','playback-health.js','favorite-driver.js','online-updates.js'];for(const name of added)await fs.writeFile(path.join(scratch,'web',name),'/* '+name+' fixture */');const prefix=added.map(name=>'/* '+name+' fixture */\n;\n').join('');
+  await fs.writeFile(path.join(scratch,'web/vendor/qrcode.js'),'/* QR fixture */');await fs.writeFile(path.join(scratch,'web/setup-checks.js'),'/* setup fixture */');
+  const added=['i18n.js','timeline.js','ui-performance.js','discovery.js','playback-health.js','favorite-driver.js','online-updates.js'];for(const name of added)await fs.writeFile(path.join(scratch,'web',name),'/* '+name+' fixture */');const prefix='/* QR fixture */\n;\n/* setup fixture */\n;\n'+added.map(name=>'/* '+name+' fixture */\n;\n').join('');
   const releases=new Releases(scratch,keys.privateKey);
   const first=await releases.publish();
   assert.equal(crypto.verify('RSA-SHA256',Buffer.from(first.manifest.payload,'base64'),keys.publicKey,Buffer.from(first.manifest.signature,'base64')),true);

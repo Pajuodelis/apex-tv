@@ -34,3 +34,5 @@ an F1 account. Their exact SHA-256 values are allowlisted by the public-source
 check after matching the upstream public file. Shaka's license is preserved
 in `web/vendor/shaka-demo-LICENSE`.
 Source: https://github.com/shaka-project/shaka-player/blob/main/demo/common/assets.js
+
+- **qrcode-generator**, Kazuhiko Arase: MIT. Used to display a sanitized diagnostic report as a QR code locally on the TV. The original bundle header and full license are preserved in `web/vendor/qrcode.js` and `web/vendor/qrcode-LICENSE`; the license is included in the TV package. Source: https://github.com/kazuhikoarase/qrcode-generator

@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.5.6 — 2026-10-12
+
+- First-run guide: TV sign-in, human-confirmed picture/sound tests, Samsung Home instructions and saved progress.
+- Readable compatibility checks and a local QR report with allowlisted fields. Clear demo and actual F1 playback results remain separate.
+- Four primary player buttons: pause/resume, cameras/POV, audio and More.
+- Focusable remote timeline: Up selects it, arrows preview a time, held arrows accelerate, OK performs one seek and Back cancels/hides. Draft movement is painted once per frame without seeking for every key.
+- English and Lithuanian UI preserved. F1 Live remains the default commentary.
+- Fixed weekend time formatting in browser/Tizen runtimes without a Node `global` alias.
+- Local UE55AU7092 test: the user confirmed smooth timeline movement and moving F1 picture/sound after a seek. This is replay evidence, not a new live-broadcast or license-rotation test.
+
 ## 0.5.5 — default F1 Live, audio choices and fullscreen controls
 
 - Selects service-provided F1 Live by default for a new main session, even if the

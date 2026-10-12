@@ -19,3 +19,13 @@ an optional private companion can send sanitized diagnostic events to that
 companion on the local network; this is disabled in the public bootstrap.
 Do not publish local app-state directories, exported sessions, complete DRM
 responses, private certificates, or personal diagnostic bundles.
+
+## Local compatibility reports
+
+The first-run guide stores its phase and human picture/sound confirmations on
+the TV. Confirmation is tied to the app revision, model and firmware; a new
+revision requires fresh verification. Compatibility sharing builds a QR code
+locally from a strict field allowlist. It does not export raw logs or account
+storage, and makes no upload. The report excludes account identifiers, LAN
+addresses, serial/DUID/MAC values, passwords, tokens, certificates, and DRM
+challenges/licenses. License/key rotation remains explicitly unverified.

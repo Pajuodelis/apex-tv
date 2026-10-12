@@ -53,7 +53,7 @@ export async function buildTV({outputDirectory=path.join(root,'dist')}={}) {
   for(const name of required) entries.push([name,await fs.readFile(path.join(root,'tv',name))]);
   entries.push(['bundled-version.js',Buffer.from('window.APEX_BUNDLED = '+JSON.stringify(metadata)+';\n')]);
   for(const [name,bytes] of release.files)entries.push(['menu/'+name,bytes]);
-  for(const name of ['dash-LICENSE.md','dash.all.min.js.LICENSE.txt'])entries.push(['menu/'+name,await fs.readFile(path.join(root,'web/vendor',name))]);
+  for(const name of ['dash-LICENSE.md','dash.all.min.js.LICENSE.txt','qrcode-LICENSE'])entries.push(['menu/'+name,await fs.readFile(path.join(root,'web/vendor',name))]);
   entries.push(['LICENSE',await fs.readFile(path.join(root,'LICENSE'))]);
   entries.push(['THIRD_PARTY_NOTICES.md',await fs.readFile(path.join(root,'THIRD_PARTY_NOTICES.md'))]);
   for(const [name,bytes]of entries){if(name!=='icon.png'&&privacyPattern.test(bytes.toString('utf8')))throw Error('Private material found in package: '+name);}

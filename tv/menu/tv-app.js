@@ -1,7 +1,2361 @@
+/* Full MIT license for this bundled library:
+MIT License
+
+Copyright (c) 2009 Kazuhiko Arase
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+*/
+//---------------------------------------------------------------------
+//
+// QR Code Generator for JavaScript
+//
+// Copyright (c) 2009 Kazuhiko Arase
+//
+// URL: http://www.d-project.com/
+//
+// Licensed under the MIT license:
+//  http://www.opensource.org/licenses/mit-license.php
+//
+// The word 'QR Code' is registered trademark of
+// DENSO WAVE INCORPORATED
+//  http://www.denso-wave.com/qrcode/faqpatent-e.html
+//
+//---------------------------------------------------------------------
+
+var qrcode = function() {
+
+  //---------------------------------------------------------------------
+  // qrcode
+  //---------------------------------------------------------------------
+
+  /**
+   * qrcode
+   * @param typeNumber 1 to 40
+   * @param errorCorrectionLevel 'L','M','Q','H'
+   */
+  var qrcode = function(typeNumber, errorCorrectionLevel) {
+
+    var PAD0 = 0xEC;
+    var PAD1 = 0x11;
+
+    var _typeNumber = typeNumber;
+    var _errorCorrectionLevel = QRErrorCorrectionLevel[errorCorrectionLevel];
+    var _modules = null;
+    var _moduleCount = 0;
+    var _dataCache = null;
+    var _dataList = [];
+
+    var _this = {};
+
+    var makeImpl = function(test, maskPattern) {
+
+      _moduleCount = _typeNumber * 4 + 17;
+      _modules = function(moduleCount) {
+        var modules = new Array(moduleCount);
+        for (var row = 0; row < moduleCount; row += 1) {
+          modules[row] = new Array(moduleCount);
+          for (var col = 0; col < moduleCount; col += 1) {
+            modules[row][col] = null;
+          }
+        }
+        return modules;
+      }(_moduleCount);
+
+      setupPositionProbePattern(0, 0);
+      setupPositionProbePattern(_moduleCount - 7, 0);
+      setupPositionProbePattern(0, _moduleCount - 7);
+      setupPositionAdjustPattern();
+      setupTimingPattern();
+      setupTypeInfo(test, maskPattern);
+
+      if (_typeNumber >= 7) {
+        setupTypeNumber(test);
+      }
+
+      if (_dataCache == null) {
+        _dataCache = createData(_typeNumber, _errorCorrectionLevel, _dataList);
+      }
+
+      mapData(_dataCache, maskPattern);
+    };
+
+    var setupPositionProbePattern = function(row, col) {
+
+      for (var r = -1; r <= 7; r += 1) {
+
+        if (row + r <= -1 || _moduleCount <= row + r) continue;
+
+        for (var c = -1; c <= 7; c += 1) {
+
+          if (col + c <= -1 || _moduleCount <= col + c) continue;
+
+          if ( (0 <= r && r <= 6 && (c == 0 || c == 6) )
+              || (0 <= c && c <= 6 && (r == 0 || r == 6) )
+              || (2 <= r && r <= 4 && 2 <= c && c <= 4) ) {
+            _modules[row + r][col + c] = true;
+          } else {
+            _modules[row + r][col + c] = false;
+          }
+        }
+      }
+    };
+
+    var getBestMaskPattern = function() {
+
+      var minLostPoint = 0;
+      var pattern = 0;
+
+      for (var i = 0; i < 8; i += 1) {
+
+        makeImpl(true, i);
+
+        var lostPoint = QRUtil.getLostPoint(_this);
+
+        if (i == 0 || minLostPoint > lostPoint) {
+          minLostPoint = lostPoint;
+          pattern = i;
+        }
+      }
+
+      return pattern;
+    };
+
+    var setupTimingPattern = function() {
+
+      for (var r = 8; r < _moduleCount - 8; r += 1) {
+        if (_modules[r][6] != null) {
+          continue;
+        }
+        _modules[r][6] = (r % 2 == 0);
+      }
+
+      for (var c = 8; c < _moduleCount - 8; c += 1) {
+        if (_modules[6][c] != null) {
+          continue;
+        }
+        _modules[6][c] = (c % 2 == 0);
+      }
+    };
+
+    var setupPositionAdjustPattern = function() {
+
+      var pos = QRUtil.getPatternPosition(_typeNumber);
+
+      for (var i = 0; i < pos.length; i += 1) {
+
+        for (var j = 0; j < pos.length; j += 1) {
+
+          var row = pos[i];
+          var col = pos[j];
+
+          if (_modules[row][col] != null) {
+            continue;
+          }
+
+          for (var r = -2; r <= 2; r += 1) {
+
+            for (var c = -2; c <= 2; c += 1) {
+
+              if (r == -2 || r == 2 || c == -2 || c == 2
+                  || (r == 0 && c == 0) ) {
+                _modules[row + r][col + c] = true;
+              } else {
+                _modules[row + r][col + c] = false;
+              }
+            }
+          }
+        }
+      }
+    };
+
+    var setupTypeNumber = function(test) {
+
+      var bits = QRUtil.getBCHTypeNumber(_typeNumber);
+
+      for (var i = 0; i < 18; i += 1) {
+        var mod = (!test && ( (bits >> i) & 1) == 1);
+        _modules[Math.floor(i / 3)][i % 3 + _moduleCount - 8 - 3] = mod;
+      }
+
+      for (var i = 0; i < 18; i += 1) {
+        var mod = (!test && ( (bits >> i) & 1) == 1);
+        _modules[i % 3 + _moduleCount - 8 - 3][Math.floor(i / 3)] = mod;
+      }
+    };
+
+    var setupTypeInfo = function(test, maskPattern) {
+
+      var data = (_errorCorrectionLevel << 3) | maskPattern;
+      var bits = QRUtil.getBCHTypeInfo(data);
+
+      // vertical
+      for (var i = 0; i < 15; i += 1) {
+
+        var mod = (!test && ( (bits >> i) & 1) == 1);
+
+        if (i < 6) {
+          _modules[i][8] = mod;
+        } else if (i < 8) {
+          _modules[i + 1][8] = mod;
+        } else {
+          _modules[_moduleCount - 15 + i][8] = mod;
+        }
+      }
+
+      // horizontal
+      for (var i = 0; i < 15; i += 1) {
+
+        var mod = (!test && ( (bits >> i) & 1) == 1);
+
+        if (i < 8) {
+          _modules[8][_moduleCount - i - 1] = mod;
+        } else if (i < 9) {
+          _modules[8][15 - i - 1 + 1] = mod;
+        } else {
+          _modules[8][15 - i - 1] = mod;
+        }
+      }
+
+      // fixed module
+      _modules[_moduleCount - 8][8] = (!test);
+    };
+
+    var mapData = function(data, maskPattern) {
+
+      var inc = -1;
+      var row = _moduleCount - 1;
+      var bitIndex = 7;
+      var byteIndex = 0;
+      var maskFunc = QRUtil.getMaskFunction(maskPattern);
+
+      for (var col = _moduleCount - 1; col > 0; col -= 2) {
+
+        if (col == 6) col -= 1;
+
+        while (true) {
+
+          for (var c = 0; c < 2; c += 1) {
+
+            if (_modules[row][col - c] == null) {
+
+              var dark = false;
+
+              if (byteIndex < data.length) {
+                dark = ( ( (data[byteIndex] >>> bitIndex) & 1) == 1);
+              }
+
+              var mask = maskFunc(row, col - c);
+
+              if (mask) {
+                dark = !dark;
+              }
+
+              _modules[row][col - c] = dark;
+              bitIndex -= 1;
+
+              if (bitIndex == -1) {
+                byteIndex += 1;
+                bitIndex = 7;
+              }
+            }
+          }
+
+          row += inc;
+
+          if (row < 0 || _moduleCount <= row) {
+            row -= inc;
+            inc = -inc;
+            break;
+          }
+        }
+      }
+    };
+
+    var createBytes = function(buffer, rsBlocks) {
+
+      var offset = 0;
+
+      var maxDcCount = 0;
+      var maxEcCount = 0;
+
+      var dcdata = new Array(rsBlocks.length);
+      var ecdata = new Array(rsBlocks.length);
+
+      for (var r = 0; r < rsBlocks.length; r += 1) {
+
+        var dcCount = rsBlocks[r].dataCount;
+        var ecCount = rsBlocks[r].totalCount - dcCount;
+
+        maxDcCount = Math.max(maxDcCount, dcCount);
+        maxEcCount = Math.max(maxEcCount, ecCount);
+
+        dcdata[r] = new Array(dcCount);
+
+        for (var i = 0; i < dcdata[r].length; i += 1) {
+          dcdata[r][i] = 0xff & buffer.getBuffer()[i + offset];
+        }
+        offset += dcCount;
+
+        var rsPoly = QRUtil.getErrorCorrectPolynomial(ecCount);
+        var rawPoly = qrPolynomial(dcdata[r], rsPoly.getLength() - 1);
+
+        var modPoly = rawPoly.mod(rsPoly);
+        ecdata[r] = new Array(rsPoly.getLength() - 1);
+        for (var i = 0; i < ecdata[r].length; i += 1) {
+          var modIndex = i + modPoly.getLength() - ecdata[r].length;
+          ecdata[r][i] = (modIndex >= 0)? modPoly.getAt(modIndex) : 0;
+        }
+      }
+
+      var totalCodeCount = 0;
+      for (var i = 0; i < rsBlocks.length; i += 1) {
+        totalCodeCount += rsBlocks[i].totalCount;
+      }
+
+      var data = new Array(totalCodeCount);
+      var index = 0;
+
+      for (var i = 0; i < maxDcCount; i += 1) {
+        for (var r = 0; r < rsBlocks.length; r += 1) {
+          if (i < dcdata[r].length) {
+            data[index] = dcdata[r][i];
+            index += 1;
+          }
+        }
+      }
+
+      for (var i = 0; i < maxEcCount; i += 1) {
+        for (var r = 0; r < rsBlocks.length; r += 1) {
+          if (i < ecdata[r].length) {
+            data[index] = ecdata[r][i];
+            index += 1;
+          }
+        }
+      }
+
+      return data;
+    };
+
+    var createData = function(typeNumber, errorCorrectionLevel, dataList) {
+
+      var rsBlocks = QRRSBlock.getRSBlocks(typeNumber, errorCorrectionLevel);
+
+      var buffer = qrBitBuffer();
+
+      for (var i = 0; i < dataList.length; i += 1) {
+        var data = dataList[i];
+        buffer.put(data.getMode(), 4);
+        buffer.put(data.getLength(), QRUtil.getLengthInBits(data.getMode(), typeNumber) );
+        data.write(buffer);
+      }
+
+      // calc num max data.
+      var totalDataCount = 0;
+      for (var i = 0; i < rsBlocks.length; i += 1) {
+        totalDataCount += rsBlocks[i].dataCount;
+      }
+
+      if (buffer.getLengthInBits() > totalDataCount * 8) {
+        throw 'code length overflow. ('
+          + buffer.getLengthInBits()
+          + '>'
+          + totalDataCount * 8
+          + ')';
+      }
+
+      // end code
+      if (buffer.getLengthInBits() + 4 <= totalDataCount * 8) {
+        buffer.put(0, 4);
+      }
+
+      // padding
+      while (buffer.getLengthInBits() % 8 != 0) {
+        buffer.putBit(false);
+      }
+
+      // padding
+      while (true) {
+
+        if (buffer.getLengthInBits() >= totalDataCount * 8) {
+          break;
+        }
+        buffer.put(PAD0, 8);
+
+        if (buffer.getLengthInBits() >= totalDataCount * 8) {
+          break;
+        }
+        buffer.put(PAD1, 8);
+      }
+
+      return createBytes(buffer, rsBlocks);
+    };
+
+    _this.addData = function(data, mode) {
+
+      mode = mode || 'Byte';
+
+      var newData = null;
+
+      switch(mode) {
+      case 'Numeric' :
+        newData = qrNumber(data);
+        break;
+      case 'Alphanumeric' :
+        newData = qrAlphaNum(data);
+        break;
+      case 'Byte' :
+        newData = qr8BitByte(data);
+        break;
+      case 'Kanji' :
+        newData = qrKanji(data);
+        break;
+      default :
+        throw 'mode:' + mode;
+      }
+
+      _dataList.push(newData);
+      _dataCache = null;
+    };
+
+    _this.isDark = function(row, col) {
+      if (row < 0 || _moduleCount <= row || col < 0 || _moduleCount <= col) {
+        throw row + ',' + col;
+      }
+      return _modules[row][col];
+    };
+
+    _this.getModuleCount = function() {
+      return _moduleCount;
+    };
+
+    _this.make = function() {
+      if (_typeNumber < 1) {
+        var typeNumber = 1;
+
+        for (; typeNumber < 40; typeNumber++) {
+          var rsBlocks = QRRSBlock.getRSBlocks(typeNumber, _errorCorrectionLevel);
+          var buffer = qrBitBuffer();
+
+          for (var i = 0; i < _dataList.length; i++) {
+            var data = _dataList[i];
+            buffer.put(data.getMode(), 4);
+            buffer.put(data.getLength(), QRUtil.getLengthInBits(data.getMode(), typeNumber) );
+            data.write(buffer);
+          }
+
+          var totalDataCount = 0;
+          for (var i = 0; i < rsBlocks.length; i++) {
+            totalDataCount += rsBlocks[i].dataCount;
+          }
+
+          if (buffer.getLengthInBits() <= totalDataCount * 8) {
+            break;
+          }
+        }
+
+        _typeNumber = typeNumber;
+      }
+
+      makeImpl(false, getBestMaskPattern() );
+    };
+
+    _this.createTableTag = function(cellSize, margin) {
+
+      cellSize = cellSize || 2;
+      margin = (typeof margin == 'undefined')? cellSize * 4 : margin;
+
+      var qrHtml = '';
+
+      qrHtml += '<table style="';
+      qrHtml += ' border-width: 0px; border-style: none;';
+      qrHtml += ' border-collapse: collapse;';
+      qrHtml += ' padding: 0px; margin: ' + margin + 'px;';
+      qrHtml += '">';
+      qrHtml += '<tbody>';
+
+      for (var r = 0; r < _this.getModuleCount(); r += 1) {
+
+        qrHtml += '<tr>';
+
+        for (var c = 0; c < _this.getModuleCount(); c += 1) {
+          qrHtml += '<td style="';
+          qrHtml += ' border-width: 0px; border-style: none;';
+          qrHtml += ' border-collapse: collapse;';
+          qrHtml += ' padding: 0px; margin: 0px;';
+          qrHtml += ' width: ' + cellSize + 'px;';
+          qrHtml += ' height: ' + cellSize + 'px;';
+          qrHtml += ' background-color: ';
+          qrHtml += _this.isDark(r, c)? '#000000' : '#ffffff';
+          qrHtml += ';';
+          qrHtml += '"/>';
+        }
+
+        qrHtml += '</tr>';
+      }
+
+      qrHtml += '</tbody>';
+      qrHtml += '</table>';
+
+      return qrHtml;
+    };
+
+    _this.createSvgTag = function(cellSize, margin, alt, title) {
+
+      var opts = {};
+      if (typeof arguments[0] == 'object') {
+        // Called by options.
+        opts = arguments[0];
+        // overwrite cellSize and margin.
+        cellSize = opts.cellSize;
+        margin = opts.margin;
+        alt = opts.alt;
+        title = opts.title;
+      }
+
+      cellSize = cellSize || 2;
+      margin = (typeof margin == 'undefined')? cellSize * 4 : margin;
+
+      // Compose alt property surrogate
+      alt = (typeof alt === 'string') ? {text: alt} : alt || {};
+      alt.text = alt.text || null;
+      alt.id = (alt.text) ? alt.id || 'qrcode-description' : null;
+
+      // Compose title property surrogate
+      title = (typeof title === 'string') ? {text: title} : title || {};
+      title.text = title.text || null;
+      title.id = (title.text) ? title.id || 'qrcode-title' : null;
+
+      var size = _this.getModuleCount() * cellSize + margin * 2;
+      var c, mc, r, mr, qrSvg='', rect;
+
+      rect = 'l' + cellSize + ',0 0,' + cellSize +
+        ' -' + cellSize + ',0 0,-' + cellSize + 'z ';
+
+      qrSvg += '<svg version="1.1" xmlns="http://www.w3.org/2000/svg"';
+      qrSvg += !opts.scalable ? ' width="' + size + 'px" height="' + size + 'px"' : '';
+      qrSvg += ' viewBox="0 0 ' + size + ' ' + size + '" ';
+      qrSvg += ' preserveAspectRatio="xMinYMin meet"';
+      qrSvg += (title.text || alt.text) ? ' role="img" aria-labelledby="' +
+          escapeXml([title.id, alt.id].join(' ').trim() ) + '"' : '';
+      qrSvg += '>';
+      qrSvg += (title.text) ? '<title id="' + escapeXml(title.id) + '">' +
+          escapeXml(title.text) + '</title>' : '';
+      qrSvg += (alt.text) ? '<description id="' + escapeXml(alt.id) + '">' +
+          escapeXml(alt.text) + '</description>' : '';
+      qrSvg += '<rect width="100%" height="100%" fill="white" cx="0" cy="0"/>';
+      qrSvg += '<path d="';
+
+      for (r = 0; r < _this.getModuleCount(); r += 1) {
+        mr = r * cellSize + margin;
+        for (c = 0; c < _this.getModuleCount(); c += 1) {
+          if (_this.isDark(r, c) ) {
+            mc = c*cellSize+margin;
+            qrSvg += 'M' + mc + ',' + mr + rect;
+          }
+        }
+      }
+
+      qrSvg += '" stroke="transparent" fill="black"/>';
+      qrSvg += '</svg>';
+
+      return qrSvg;
+    };
+
+    _this.createDataURL = function(cellSize, margin) {
+
+      cellSize = cellSize || 2;
+      margin = (typeof margin == 'undefined')? cellSize * 4 : margin;
+
+      var size = _this.getModuleCount() * cellSize + margin * 2;
+      var min = margin;
+      var max = size - margin;
+
+      return createDataURL(size, size, function(x, y) {
+        if (min <= x && x < max && min <= y && y < max) {
+          var c = Math.floor( (x - min) / cellSize);
+          var r = Math.floor( (y - min) / cellSize);
+          return _this.isDark(r, c)? 0 : 1;
+        } else {
+          return 1;
+        }
+      } );
+    };
+
+    _this.createImgTag = function(cellSize, margin, alt) {
+
+      cellSize = cellSize || 2;
+      margin = (typeof margin == 'undefined')? cellSize * 4 : margin;
+
+      var size = _this.getModuleCount() * cellSize + margin * 2;
+
+      var img = '';
+      img += '<img';
+      img += '\u0020src="';
+      img += _this.createDataURL(cellSize, margin);
+      img += '"';
+      img += '\u0020width="';
+      img += size;
+      img += '"';
+      img += '\u0020height="';
+      img += size;
+      img += '"';
+      if (alt) {
+        img += '\u0020alt="';
+        img += escapeXml(alt);
+        img += '"';
+      }
+      img += '/>';
+
+      return img;
+    };
+
+    var escapeXml = function(s) {
+      var escaped = '';
+      for (var i = 0; i < s.length; i += 1) {
+        var c = s.charAt(i);
+        switch(c) {
+        case '<': escaped += '&lt;'; break;
+        case '>': escaped += '&gt;'; break;
+        case '&': escaped += '&amp;'; break;
+        case '"': escaped += '&quot;'; break;
+        default : escaped += c; break;
+        }
+      }
+      return escaped;
+    };
+
+    var _createHalfASCII = function(margin) {
+      var cellSize = 1;
+      margin = (typeof margin == 'undefined')? cellSize * 2 : margin;
+
+      var size = _this.getModuleCount() * cellSize + margin * 2;
+      var min = margin;
+      var max = size - margin;
+
+      var y, x, r1, r2, p;
+
+      var blocks = {
+        '██': '█',
+        '█ ': '▀',
+        ' █': '▄',
+        '  ': ' '
+      };
+
+      var blocksLastLineNoMargin = {
+        '██': '▀',
+        '█ ': '▀',
+        ' █': ' ',
+        '  ': ' '
+      };
+
+      var ascii = '';
+      for (y = 0; y < size; y += 2) {
+        r1 = Math.floor((y - min) / cellSize);
+        r2 = Math.floor((y + 1 - min) / cellSize);
+        for (x = 0; x < size; x += 1) {
+          p = '█';
+
+          if (min <= x && x < max && min <= y && y < max && _this.isDark(r1, Math.floor((x - min) / cellSize))) {
+            p = ' ';
+          }
+
+          if (min <= x && x < max && min <= y+1 && y+1 < max && _this.isDark(r2, Math.floor((x - min) / cellSize))) {
+            p += ' ';
+          }
+          else {
+            p += '█';
+          }
+
+          // Output 2 characters per pixel, to create full square. 1 character per pixels gives only half width of square.
+          ascii += (margin < 1 && y+1 >= max) ? blocksLastLineNoMargin[p] : blocks[p];
+        }
+
+        ascii += '\n';
+      }
+
+      if (size % 2 && margin > 0) {
+        return ascii.substring(0, ascii.length - size - 1) + Array(size+1).join('▀');
+      }
+
+      return ascii.substring(0, ascii.length-1);
+    };
+
+    _this.createASCII = function(cellSize, margin) {
+      cellSize = cellSize || 1;
+
+      if (cellSize < 2) {
+        return _createHalfASCII(margin);
+      }
+
+      cellSize -= 1;
+      margin = (typeof margin == 'undefined')? cellSize * 2 : margin;
+
+      var size = _this.getModuleCount() * cellSize + margin * 2;
+      var min = margin;
+      var max = size - margin;
+
+      var y, x, r, p;
+
+      var white = Array(cellSize+1).join('██');
+      var black = Array(cellSize+1).join('  ');
+
+      var ascii = '';
+      var line = '';
+      for (y = 0; y < size; y += 1) {
+        r = Math.floor( (y - min) / cellSize);
+        line = '';
+        for (x = 0; x < size; x += 1) {
+          p = 1;
+
+          if (min <= x && x < max && min <= y && y < max && _this.isDark(r, Math.floor((x - min) / cellSize))) {
+            p = 0;
+          }
+
+          // Output 2 characters per pixel, to create full square. 1 character per pixels gives only half width of square.
+          line += p ? white : black;
+        }
+
+        for (r = 0; r < cellSize; r += 1) {
+          ascii += line + '\n';
+        }
+      }
+
+      return ascii.substring(0, ascii.length-1);
+    };
+
+    _this.renderTo2dContext = function(context, cellSize) {
+      cellSize = cellSize || 2;
+      var length = _this.getModuleCount();
+      for (var row = 0; row < length; row++) {
+        for (var col = 0; col < length; col++) {
+          context.fillStyle = _this.isDark(row, col) ? 'black' : 'white';
+          context.fillRect(col * cellSize, row * cellSize, cellSize, cellSize);
+        }
+      }
+    }
+
+    return _this;
+  };
+
+  //---------------------------------------------------------------------
+  // qrcode.stringToBytes
+  //---------------------------------------------------------------------
+
+  qrcode.stringToBytesFuncs = {
+    'default' : function(s) {
+      var bytes = [];
+      for (var i = 0; i < s.length; i += 1) {
+        var c = s.charCodeAt(i);
+        bytes.push(c & 0xff);
+      }
+      return bytes;
+    }
+  };
+
+  qrcode.stringToBytes = qrcode.stringToBytesFuncs['default'];
+
+  //---------------------------------------------------------------------
+  // qrcode.createStringToBytes
+  //---------------------------------------------------------------------
+
+  /**
+   * @param unicodeData base64 string of byte array.
+   * [16bit Unicode],[16bit Bytes], ...
+   * @param numChars
+   */
+  qrcode.createStringToBytes = function(unicodeData, numChars) {
+
+    // create conversion map.
+
+    var unicodeMap = function() {
+
+      var bin = base64DecodeInputStream(unicodeData);
+      var read = function() {
+        var b = bin.read();
+        if (b == -1) throw 'eof';
+        return b;
+      };
+
+      var count = 0;
+      var unicodeMap = {};
+      while (true) {
+        var b0 = bin.read();
+        if (b0 == -1) break;
+        var b1 = read();
+        var b2 = read();
+        var b3 = read();
+        var k = String.fromCharCode( (b0 << 8) | b1);
+        var v = (b2 << 8) | b3;
+        unicodeMap[k] = v;
+        count += 1;
+      }
+      if (count != numChars) {
+        throw count + ' != ' + numChars;
+      }
+
+      return unicodeMap;
+    }();
+
+    var unknownChar = '?'.charCodeAt(0);
+
+    return function(s) {
+      var bytes = [];
+      for (var i = 0; i < s.length; i += 1) {
+        var c = s.charCodeAt(i);
+        if (c < 128) {
+          bytes.push(c);
+        } else {
+          var b = unicodeMap[s.charAt(i)];
+          if (typeof b == 'number') {
+            if ( (b & 0xff) == b) {
+              // 1byte
+              bytes.push(b);
+            } else {
+              // 2bytes
+              bytes.push(b >>> 8);
+              bytes.push(b & 0xff);
+            }
+          } else {
+            bytes.push(unknownChar);
+          }
+        }
+      }
+      return bytes;
+    };
+  };
+
+  //---------------------------------------------------------------------
+  // QRMode
+  //---------------------------------------------------------------------
+
+  var QRMode = {
+    MODE_NUMBER :    1 << 0,
+    MODE_ALPHA_NUM : 1 << 1,
+    MODE_8BIT_BYTE : 1 << 2,
+    MODE_KANJI :     1 << 3
+  };
+
+  //---------------------------------------------------------------------
+  // QRErrorCorrectionLevel
+  //---------------------------------------------------------------------
+
+  var QRErrorCorrectionLevel = {
+    L : 1,
+    M : 0,
+    Q : 3,
+    H : 2
+  };
+
+  //---------------------------------------------------------------------
+  // QRMaskPattern
+  //---------------------------------------------------------------------
+
+  var QRMaskPattern = {
+    PATTERN000 : 0,
+    PATTERN001 : 1,
+    PATTERN010 : 2,
+    PATTERN011 : 3,
+    PATTERN100 : 4,
+    PATTERN101 : 5,
+    PATTERN110 : 6,
+    PATTERN111 : 7
+  };
+
+  //---------------------------------------------------------------------
+  // QRUtil
+  //---------------------------------------------------------------------
+
+  var QRUtil = function() {
+
+    var PATTERN_POSITION_TABLE = [
+      [],
+      [6, 18],
+      [6, 22],
+      [6, 26],
+      [6, 30],
+      [6, 34],
+      [6, 22, 38],
+      [6, 24, 42],
+      [6, 26, 46],
+      [6, 28, 50],
+      [6, 30, 54],
+      [6, 32, 58],
+      [6, 34, 62],
+      [6, 26, 46, 66],
+      [6, 26, 48, 70],
+      [6, 26, 50, 74],
+      [6, 30, 54, 78],
+      [6, 30, 56, 82],
+      [6, 30, 58, 86],
+      [6, 34, 62, 90],
+      [6, 28, 50, 72, 94],
+      [6, 26, 50, 74, 98],
+      [6, 30, 54, 78, 102],
+      [6, 28, 54, 80, 106],
+      [6, 32, 58, 84, 110],
+      [6, 30, 58, 86, 114],
+      [6, 34, 62, 90, 118],
+      [6, 26, 50, 74, 98, 122],
+      [6, 30, 54, 78, 102, 126],
+      [6, 26, 52, 78, 104, 130],
+      [6, 30, 56, 82, 108, 134],
+      [6, 34, 60, 86, 112, 138],
+      [6, 30, 58, 86, 114, 142],
+      [6, 34, 62, 90, 118, 146],
+      [6, 30, 54, 78, 102, 126, 150],
+      [6, 24, 50, 76, 102, 128, 154],
+      [6, 28, 54, 80, 106, 132, 158],
+      [6, 32, 58, 84, 110, 136, 162],
+      [6, 26, 54, 82, 110, 138, 166],
+      [6, 30, 58, 86, 114, 142, 170]
+    ];
+    var G15 = (1 << 10) | (1 << 8) | (1 << 5) | (1 << 4) | (1 << 2) | (1 << 1) | (1 << 0);
+    var G18 = (1 << 12) | (1 << 11) | (1 << 10) | (1 << 9) | (1 << 8) | (1 << 5) | (1 << 2) | (1 << 0);
+    var G15_MASK = (1 << 14) | (1 << 12) | (1 << 10) | (1 << 4) | (1 << 1);
+
+    var _this = {};
+
+    var getBCHDigit = function(data) {
+      var digit = 0;
+      while (data != 0) {
+        digit += 1;
+        data >>>= 1;
+      }
+      return digit;
+    };
+
+    _this.getBCHTypeInfo = function(data) {
+      var d = data << 10;
+      while (getBCHDigit(d) - getBCHDigit(G15) >= 0) {
+        d ^= (G15 << (getBCHDigit(d) - getBCHDigit(G15) ) );
+      }
+      return ( (data << 10) | d) ^ G15_MASK;
+    };
+
+    _this.getBCHTypeNumber = function(data) {
+      var d = data << 12;
+      while (getBCHDigit(d) - getBCHDigit(G18) >= 0) {
+        d ^= (G18 << (getBCHDigit(d) - getBCHDigit(G18) ) );
+      }
+      return (data << 12) | d;
+    };
+
+    _this.getPatternPosition = function(typeNumber) {
+      return PATTERN_POSITION_TABLE[typeNumber - 1];
+    };
+
+    _this.getMaskFunction = function(maskPattern) {
+
+      switch (maskPattern) {
+
+      case QRMaskPattern.PATTERN000 :
+        return function(i, j) { return (i + j) % 2 == 0; };
+      case QRMaskPattern.PATTERN001 :
+        return function(i, j) { return i % 2 == 0; };
+      case QRMaskPattern.PATTERN010 :
+        return function(i, j) { return j % 3 == 0; };
+      case QRMaskPattern.PATTERN011 :
+        return function(i, j) { return (i + j) % 3 == 0; };
+      case QRMaskPattern.PATTERN100 :
+        return function(i, j) { return (Math.floor(i / 2) + Math.floor(j / 3) ) % 2 == 0; };
+      case QRMaskPattern.PATTERN101 :
+        return function(i, j) { return (i * j) % 2 + (i * j) % 3 == 0; };
+      case QRMaskPattern.PATTERN110 :
+        return function(i, j) { return ( (i * j) % 2 + (i * j) % 3) % 2 == 0; };
+      case QRMaskPattern.PATTERN111 :
+        return function(i, j) { return ( (i * j) % 3 + (i + j) % 2) % 2 == 0; };
+
+      default :
+        throw 'bad maskPattern:' + maskPattern;
+      }
+    };
+
+    _this.getErrorCorrectPolynomial = function(errorCorrectLength) {
+      var a = qrPolynomial([1], 0);
+      for (var i = 0; i < errorCorrectLength; i += 1) {
+        a = a.multiply(qrPolynomial([1, QRMath.gexp(i)], 0) );
+      }
+      return a;
+    };
+
+    _this.getLengthInBits = function(mode, type) {
+
+      if (1 <= type && type < 10) {
+
+        // 1 - 9
+
+        switch(mode) {
+        case QRMode.MODE_NUMBER    : return 10;
+        case QRMode.MODE_ALPHA_NUM : return 9;
+        case QRMode.MODE_8BIT_BYTE : return 8;
+        case QRMode.MODE_KANJI     : return 8;
+        default :
+          throw 'mode:' + mode;
+        }
+
+      } else if (type < 27) {
+
+        // 10 - 26
+
+        switch(mode) {
+        case QRMode.MODE_NUMBER    : return 12;
+        case QRMode.MODE_ALPHA_NUM : return 11;
+        case QRMode.MODE_8BIT_BYTE : return 16;
+        case QRMode.MODE_KANJI     : return 10;
+        default :
+          throw 'mode:' + mode;
+        }
+
+      } else if (type < 41) {
+
+        // 27 - 40
+
+        switch(mode) {
+        case QRMode.MODE_NUMBER    : return 14;
+        case QRMode.MODE_ALPHA_NUM : return 13;
+        case QRMode.MODE_8BIT_BYTE : return 16;
+        case QRMode.MODE_KANJI     : return 12;
+        default :
+          throw 'mode:' + mode;
+        }
+
+      } else {
+        throw 'type:' + type;
+      }
+    };
+
+    _this.getLostPoint = function(qrcode) {
+
+      var moduleCount = qrcode.getModuleCount();
+
+      var lostPoint = 0;
+
+      // LEVEL1
+
+      for (var row = 0; row < moduleCount; row += 1) {
+        for (var col = 0; col < moduleCount; col += 1) {
+
+          var sameCount = 0;
+          var dark = qrcode.isDark(row, col);
+
+          for (var r = -1; r <= 1; r += 1) {
+
+            if (row + r < 0 || moduleCount <= row + r) {
+              continue;
+            }
+
+            for (var c = -1; c <= 1; c += 1) {
+
+              if (col + c < 0 || moduleCount <= col + c) {
+                continue;
+              }
+
+              if (r == 0 && c == 0) {
+                continue;
+              }
+
+              if (dark == qrcode.isDark(row + r, col + c) ) {
+                sameCount += 1;
+              }
+            }
+          }
+
+          if (sameCount > 5) {
+            lostPoint += (3 + sameCount - 5);
+          }
+        }
+      };
+
+      // LEVEL2
+
+      for (var row = 0; row < moduleCount - 1; row += 1) {
+        for (var col = 0; col < moduleCount - 1; col += 1) {
+          var count = 0;
+          if (qrcode.isDark(row, col) ) count += 1;
+          if (qrcode.isDark(row + 1, col) ) count += 1;
+          if (qrcode.isDark(row, col + 1) ) count += 1;
+          if (qrcode.isDark(row + 1, col + 1) ) count += 1;
+          if (count == 0 || count == 4) {
+            lostPoint += 3;
+          }
+        }
+      }
+
+      // LEVEL3
+
+      for (var row = 0; row < moduleCount; row += 1) {
+        for (var col = 0; col < moduleCount - 6; col += 1) {
+          if (qrcode.isDark(row, col)
+              && !qrcode.isDark(row, col + 1)
+              &&  qrcode.isDark(row, col + 2)
+              &&  qrcode.isDark(row, col + 3)
+              &&  qrcode.isDark(row, col + 4)
+              && !qrcode.isDark(row, col + 5)
+              &&  qrcode.isDark(row, col + 6) ) {
+            lostPoint += 40;
+          }
+        }
+      }
+
+      for (var col = 0; col < moduleCount; col += 1) {
+        for (var row = 0; row < moduleCount - 6; row += 1) {
+          if (qrcode.isDark(row, col)
+              && !qrcode.isDark(row + 1, col)
+              &&  qrcode.isDark(row + 2, col)
+              &&  qrcode.isDark(row + 3, col)
+              &&  qrcode.isDark(row + 4, col)
+              && !qrcode.isDark(row + 5, col)
+              &&  qrcode.isDark(row + 6, col) ) {
+            lostPoint += 40;
+          }
+        }
+      }
+
+      // LEVEL4
+
+      var darkCount = 0;
+
+      for (var col = 0; col < moduleCount; col += 1) {
+        for (var row = 0; row < moduleCount; row += 1) {
+          if (qrcode.isDark(row, col) ) {
+            darkCount += 1;
+          }
+        }
+      }
+
+      var ratio = Math.abs(100 * darkCount / moduleCount / moduleCount - 50) / 5;
+      lostPoint += ratio * 10;
+
+      return lostPoint;
+    };
+
+    return _this;
+  }();
+
+  //---------------------------------------------------------------------
+  // QRMath
+  //---------------------------------------------------------------------
+
+  var QRMath = function() {
+
+    var EXP_TABLE = new Array(256);
+    var LOG_TABLE = new Array(256);
+
+    // initialize tables
+    for (var i = 0; i < 8; i += 1) {
+      EXP_TABLE[i] = 1 << i;
+    }
+    for (var i = 8; i < 256; i += 1) {
+      EXP_TABLE[i] = EXP_TABLE[i - 4]
+        ^ EXP_TABLE[i - 5]
+        ^ EXP_TABLE[i - 6]
+        ^ EXP_TABLE[i - 8];
+    }
+    for (var i = 0; i < 255; i += 1) {
+      LOG_TABLE[EXP_TABLE[i] ] = i;
+    }
+
+    var _this = {};
+
+    _this.glog = function(n) {
+
+      if (n < 1) {
+        throw 'glog(' + n + ')';
+      }
+
+      return LOG_TABLE[n];
+    };
+
+    _this.gexp = function(n) {
+
+      while (n < 0) {
+        n += 255;
+      }
+
+      while (n >= 256) {
+        n -= 255;
+      }
+
+      return EXP_TABLE[n];
+    };
+
+    return _this;
+  }();
+
+  //---------------------------------------------------------------------
+  // qrPolynomial
+  //---------------------------------------------------------------------
+
+  function qrPolynomial(num, shift) {
+
+    if (typeof num.length == 'undefined') {
+      throw num.length + '/' + shift;
+    }
+
+    var _num = function() {
+      var offset = 0;
+      while (offset < num.length && num[offset] == 0) {
+        offset += 1;
+      }
+      var _num = new Array(num.length - offset + shift);
+      for (var i = 0; i < num.length - offset; i += 1) {
+        _num[i] = num[i + offset];
+      }
+      return _num;
+    }();
+
+    var _this = {};
+
+    _this.getAt = function(index) {
+      return _num[index];
+    };
+
+    _this.getLength = function() {
+      return _num.length;
+    };
+
+    _this.multiply = function(e) {
+
+      var num = new Array(_this.getLength() + e.getLength() - 1);
+
+      for (var i = 0; i < _this.getLength(); i += 1) {
+        for (var j = 0; j < e.getLength(); j += 1) {
+          num[i + j] ^= QRMath.gexp(QRMath.glog(_this.getAt(i) ) + QRMath.glog(e.getAt(j) ) );
+        }
+      }
+
+      return qrPolynomial(num, 0);
+    };
+
+    _this.mod = function(e) {
+
+      if (_this.getLength() - e.getLength() < 0) {
+        return _this;
+      }
+
+      var ratio = QRMath.glog(_this.getAt(0) ) - QRMath.glog(e.getAt(0) );
+
+      var num = new Array(_this.getLength() );
+      for (var i = 0; i < _this.getLength(); i += 1) {
+        num[i] = _this.getAt(i);
+      }
+
+      for (var i = 0; i < e.getLength(); i += 1) {
+        num[i] ^= QRMath.gexp(QRMath.glog(e.getAt(i) ) + ratio);
+      }
+
+      // recursive call
+      return qrPolynomial(num, 0).mod(e);
+    };
+
+    return _this;
+  };
+
+  //---------------------------------------------------------------------
+  // QRRSBlock
+  //---------------------------------------------------------------------
+
+  var QRRSBlock = function() {
+
+    var RS_BLOCK_TABLE = [
+
+      // L
+      // M
+      // Q
+      // H
+
+      // 1
+      [1, 26, 19],
+      [1, 26, 16],
+      [1, 26, 13],
+      [1, 26, 9],
+
+      // 2
+      [1, 44, 34],
+      [1, 44, 28],
+      [1, 44, 22],
+      [1, 44, 16],
+
+      // 3
+      [1, 70, 55],
+      [1, 70, 44],
+      [2, 35, 17],
+      [2, 35, 13],
+
+      // 4
+      [1, 100, 80],
+      [2, 50, 32],
+      [2, 50, 24],
+      [4, 25, 9],
+
+      // 5
+      [1, 134, 108],
+      [2, 67, 43],
+      [2, 33, 15, 2, 34, 16],
+      [2, 33, 11, 2, 34, 12],
+
+      // 6
+      [2, 86, 68],
+      [4, 43, 27],
+      [4, 43, 19],
+      [4, 43, 15],
+
+      // 7
+      [2, 98, 78],
+      [4, 49, 31],
+      [2, 32, 14, 4, 33, 15],
+      [4, 39, 13, 1, 40, 14],
+
+      // 8
+      [2, 121, 97],
+      [2, 60, 38, 2, 61, 39],
+      [4, 40, 18, 2, 41, 19],
+      [4, 40, 14, 2, 41, 15],
+
+      // 9
+      [2, 146, 116],
+      [3, 58, 36, 2, 59, 37],
+      [4, 36, 16, 4, 37, 17],
+      [4, 36, 12, 4, 37, 13],
+
+      // 10
+      [2, 86, 68, 2, 87, 69],
+      [4, 69, 43, 1, 70, 44],
+      [6, 43, 19, 2, 44, 20],
+      [6, 43, 15, 2, 44, 16],
+
+      // 11
+      [4, 101, 81],
+      [1, 80, 50, 4, 81, 51],
+      [4, 50, 22, 4, 51, 23],
+      [3, 36, 12, 8, 37, 13],
+
+      // 12
+      [2, 116, 92, 2, 117, 93],
+      [6, 58, 36, 2, 59, 37],
+      [4, 46, 20, 6, 47, 21],
+      [7, 42, 14, 4, 43, 15],
+
+      // 13
+      [4, 133, 107],
+      [8, 59, 37, 1, 60, 38],
+      [8, 44, 20, 4, 45, 21],
+      [12, 33, 11, 4, 34, 12],
+
+      // 14
+      [3, 145, 115, 1, 146, 116],
+      [4, 64, 40, 5, 65, 41],
+      [11, 36, 16, 5, 37, 17],
+      [11, 36, 12, 5, 37, 13],
+
+      // 15
+      [5, 109, 87, 1, 110, 88],
+      [5, 65, 41, 5, 66, 42],
+      [5, 54, 24, 7, 55, 25],
+      [11, 36, 12, 7, 37, 13],
+
+      // 16
+      [5, 122, 98, 1, 123, 99],
+      [7, 73, 45, 3, 74, 46],
+      [15, 43, 19, 2, 44, 20],
+      [3, 45, 15, 13, 46, 16],
+
+      // 17
+      [1, 135, 107, 5, 136, 108],
+      [10, 74, 46, 1, 75, 47],
+      [1, 50, 22, 15, 51, 23],
+      [2, 42, 14, 17, 43, 15],
+
+      // 18
+      [5, 150, 120, 1, 151, 121],
+      [9, 69, 43, 4, 70, 44],
+      [17, 50, 22, 1, 51, 23],
+      [2, 42, 14, 19, 43, 15],
+
+      // 19
+      [3, 141, 113, 4, 142, 114],
+      [3, 70, 44, 11, 71, 45],
+      [17, 47, 21, 4, 48, 22],
+      [9, 39, 13, 16, 40, 14],
+
+      // 20
+      [3, 135, 107, 5, 136, 108],
+      [3, 67, 41, 13, 68, 42],
+      [15, 54, 24, 5, 55, 25],
+      [15, 43, 15, 10, 44, 16],
+
+      // 21
+      [4, 144, 116, 4, 145, 117],
+      [17, 68, 42],
+      [17, 50, 22, 6, 51, 23],
+      [19, 46, 16, 6, 47, 17],
+
+      // 22
+      [2, 139, 111, 7, 140, 112],
+      [17, 74, 46],
+      [7, 54, 24, 16, 55, 25],
+      [34, 37, 13],
+
+      // 23
+      [4, 151, 121, 5, 152, 122],
+      [4, 75, 47, 14, 76, 48],
+      [11, 54, 24, 14, 55, 25],
+      [16, 45, 15, 14, 46, 16],
+
+      // 24
+      [6, 147, 117, 4, 148, 118],
+      [6, 73, 45, 14, 74, 46],
+      [11, 54, 24, 16, 55, 25],
+      [30, 46, 16, 2, 47, 17],
+
+      // 25
+      [8, 132, 106, 4, 133, 107],
+      [8, 75, 47, 13, 76, 48],
+      [7, 54, 24, 22, 55, 25],
+      [22, 45, 15, 13, 46, 16],
+
+      // 26
+      [10, 142, 114, 2, 143, 115],
+      [19, 74, 46, 4, 75, 47],
+      [28, 50, 22, 6, 51, 23],
+      [33, 46, 16, 4, 47, 17],
+
+      // 27
+      [8, 152, 122, 4, 153, 123],
+      [22, 73, 45, 3, 74, 46],
+      [8, 53, 23, 26, 54, 24],
+      [12, 45, 15, 28, 46, 16],
+
+      // 28
+      [3, 147, 117, 10, 148, 118],
+      [3, 73, 45, 23, 74, 46],
+      [4, 54, 24, 31, 55, 25],
+      [11, 45, 15, 31, 46, 16],
+
+      // 29
+      [7, 146, 116, 7, 147, 117],
+      [21, 73, 45, 7, 74, 46],
+      [1, 53, 23, 37, 54, 24],
+      [19, 45, 15, 26, 46, 16],
+
+      // 30
+      [5, 145, 115, 10, 146, 116],
+      [19, 75, 47, 10, 76, 48],
+      [15, 54, 24, 25, 55, 25],
+      [23, 45, 15, 25, 46, 16],
+
+      // 31
+      [13, 145, 115, 3, 146, 116],
+      [2, 74, 46, 29, 75, 47],
+      [42, 54, 24, 1, 55, 25],
+      [23, 45, 15, 28, 46, 16],
+
+      // 32
+      [17, 145, 115],
+      [10, 74, 46, 23, 75, 47],
+      [10, 54, 24, 35, 55, 25],
+      [19, 45, 15, 35, 46, 16],
+
+      // 33
+      [17, 145, 115, 1, 146, 116],
+      [14, 74, 46, 21, 75, 47],
+      [29, 54, 24, 19, 55, 25],
+      [11, 45, 15, 46, 46, 16],
+
+      // 34
+      [13, 145, 115, 6, 146, 116],
+      [14, 74, 46, 23, 75, 47],
+      [44, 54, 24, 7, 55, 25],
+      [59, 46, 16, 1, 47, 17],
+
+      // 35
+      [12, 151, 121, 7, 152, 122],
+      [12, 75, 47, 26, 76, 48],
+      [39, 54, 24, 14, 55, 25],
+      [22, 45, 15, 41, 46, 16],
+
+      // 36
+      [6, 151, 121, 14, 152, 122],
+      [6, 75, 47, 34, 76, 48],
+      [46, 54, 24, 10, 55, 25],
+      [2, 45, 15, 64, 46, 16],
+
+      // 37
+      [17, 152, 122, 4, 153, 123],
+      [29, 74, 46, 14, 75, 47],
+      [49, 54, 24, 10, 55, 25],
+      [24, 45, 15, 46, 46, 16],
+
+      // 38
+      [4, 152, 122, 18, 153, 123],
+      [13, 74, 46, 32, 75, 47],
+      [48, 54, 24, 14, 55, 25],
+      [42, 45, 15, 32, 46, 16],
+
+      // 39
+      [20, 147, 117, 4, 148, 118],
+      [40, 75, 47, 7, 76, 48],
+      [43, 54, 24, 22, 55, 25],
+      [10, 45, 15, 67, 46, 16],
+
+      // 40
+      [19, 148, 118, 6, 149, 119],
+      [18, 75, 47, 31, 76, 48],
+      [34, 54, 24, 34, 55, 25],
+      [20, 45, 15, 61, 46, 16]
+    ];
+
+    var qrRSBlock = function(totalCount, dataCount) {
+      var _this = {};
+      _this.totalCount = totalCount;
+      _this.dataCount = dataCount;
+      return _this;
+    };
+
+    var _this = {};
+
+    var getRsBlockTable = function(typeNumber, errorCorrectionLevel) {
+
+      switch(errorCorrectionLevel) {
+      case QRErrorCorrectionLevel.L :
+        return RS_BLOCK_TABLE[(typeNumber - 1) * 4 + 0];
+      case QRErrorCorrectionLevel.M :
+        return RS_BLOCK_TABLE[(typeNumber - 1) * 4 + 1];
+      case QRErrorCorrectionLevel.Q :
+        return RS_BLOCK_TABLE[(typeNumber - 1) * 4 + 2];
+      case QRErrorCorrectionLevel.H :
+        return RS_BLOCK_TABLE[(typeNumber - 1) * 4 + 3];
+      default :
+        return undefined;
+      }
+    };
+
+    _this.getRSBlocks = function(typeNumber, errorCorrectionLevel) {
+
+      var rsBlock = getRsBlockTable(typeNumber, errorCorrectionLevel);
+
+      if (typeof rsBlock == 'undefined') {
+        throw 'bad rs block @ typeNumber:' + typeNumber +
+            '/errorCorrectionLevel:' + errorCorrectionLevel;
+      }
+
+      var length = rsBlock.length / 3;
+
+      var list = [];
+
+      for (var i = 0; i < length; i += 1) {
+
+        var count = rsBlock[i * 3 + 0];
+        var totalCount = rsBlock[i * 3 + 1];
+        var dataCount = rsBlock[i * 3 + 2];
+
+        for (var j = 0; j < count; j += 1) {
+          list.push(qrRSBlock(totalCount, dataCount) );
+        }
+      }
+
+      return list;
+    };
+
+    return _this;
+  }();
+
+  //---------------------------------------------------------------------
+  // qrBitBuffer
+  //---------------------------------------------------------------------
+
+  var qrBitBuffer = function() {
+
+    var _buffer = [];
+    var _length = 0;
+
+    var _this = {};
+
+    _this.getBuffer = function() {
+      return _buffer;
+    };
+
+    _this.getAt = function(index) {
+      var bufIndex = Math.floor(index / 8);
+      return ( (_buffer[bufIndex] >>> (7 - index % 8) ) & 1) == 1;
+    };
+
+    _this.put = function(num, length) {
+      for (var i = 0; i < length; i += 1) {
+        _this.putBit( ( (num >>> (length - i - 1) ) & 1) == 1);
+      }
+    };
+
+    _this.getLengthInBits = function() {
+      return _length;
+    };
+
+    _this.putBit = function(bit) {
+
+      var bufIndex = Math.floor(_length / 8);
+      if (_buffer.length <= bufIndex) {
+        _buffer.push(0);
+      }
+
+      if (bit) {
+        _buffer[bufIndex] |= (0x80 >>> (_length % 8) );
+      }
+
+      _length += 1;
+    };
+
+    return _this;
+  };
+
+  //---------------------------------------------------------------------
+  // qrNumber
+  //---------------------------------------------------------------------
+
+  var qrNumber = function(data) {
+
+    var _mode = QRMode.MODE_NUMBER;
+    var _data = data;
+
+    var _this = {};
+
+    _this.getMode = function() {
+      return _mode;
+    };
+
+    _this.getLength = function(buffer) {
+      return _data.length;
+    };
+
+    _this.write = function(buffer) {
+
+      var data = _data;
+
+      var i = 0;
+
+      while (i + 2 < data.length) {
+        buffer.put(strToNum(data.substring(i, i + 3) ), 10);
+        i += 3;
+      }
+
+      if (i < data.length) {
+        if (data.length - i == 1) {
+          buffer.put(strToNum(data.substring(i, i + 1) ), 4);
+        } else if (data.length - i == 2) {
+          buffer.put(strToNum(data.substring(i, i + 2) ), 7);
+        }
+      }
+    };
+
+    var strToNum = function(s) {
+      var num = 0;
+      for (var i = 0; i < s.length; i += 1) {
+        num = num * 10 + chatToNum(s.charAt(i) );
+      }
+      return num;
+    };
+
+    var chatToNum = function(c) {
+      if ('0' <= c && c <= '9') {
+        return c.charCodeAt(0) - '0'.charCodeAt(0);
+      }
+      throw 'illegal char :' + c;
+    };
+
+    return _this;
+  };
+
+  //---------------------------------------------------------------------
+  // qrAlphaNum
+  //---------------------------------------------------------------------
+
+  var qrAlphaNum = function(data) {
+
+    var _mode = QRMode.MODE_ALPHA_NUM;
+    var _data = data;
+
+    var _this = {};
+
+    _this.getMode = function() {
+      return _mode;
+    };
+
+    _this.getLength = function(buffer) {
+      return _data.length;
+    };
+
+    _this.write = function(buffer) {
+
+      var s = _data;
+
+      var i = 0;
+
+      while (i + 1 < s.length) {
+        buffer.put(
+          getCode(s.charAt(i) ) * 45 +
+          getCode(s.charAt(i + 1) ), 11);
+        i += 2;
+      }
+
+      if (i < s.length) {
+        buffer.put(getCode(s.charAt(i) ), 6);
+      }
+    };
+
+    var getCode = function(c) {
+
+      if ('0' <= c && c <= '9') {
+        return c.charCodeAt(0) - '0'.charCodeAt(0);
+      } else if ('A' <= c && c <= 'Z') {
+        return c.charCodeAt(0) - 'A'.charCodeAt(0) + 10;
+      } else {
+        switch (c) {
+        case ' ' : return 36;
+        case '$' : return 37;
+        case '%' : return 38;
+        case '*' : return 39;
+        case '+' : return 40;
+        case '-' : return 41;
+        case '.' : return 42;
+        case '/' : return 43;
+        case ':' : return 44;
+        default :
+          throw 'illegal char :' + c;
+        }
+      }
+    };
+
+    return _this;
+  };
+
+  //---------------------------------------------------------------------
+  // qr8BitByte
+  //---------------------------------------------------------------------
+
+  var qr8BitByte = function(data) {
+
+    var _mode = QRMode.MODE_8BIT_BYTE;
+    var _data = data;
+    var _bytes = qrcode.stringToBytes(data);
+
+    var _this = {};
+
+    _this.getMode = function() {
+      return _mode;
+    };
+
+    _this.getLength = function(buffer) {
+      return _bytes.length;
+    };
+
+    _this.write = function(buffer) {
+      for (var i = 0; i < _bytes.length; i += 1) {
+        buffer.put(_bytes[i], 8);
+      }
+    };
+
+    return _this;
+  };
+
+  //---------------------------------------------------------------------
+  // qrKanji
+  //---------------------------------------------------------------------
+
+  var qrKanji = function(data) {
+
+    var _mode = QRMode.MODE_KANJI;
+    var _data = data;
+
+    var stringToBytes = qrcode.stringToBytesFuncs['SJIS'];
+    if (!stringToBytes) {
+      throw 'sjis not supported.';
+    }
+    !function(c, code) {
+      // self test for sjis support.
+      var test = stringToBytes(c);
+      if (test.length != 2 || ( (test[0] << 8) | test[1]) != code) {
+        throw 'sjis not supported.';
+      }
+    }('\u53cb', 0x9746);
+
+    var _bytes = stringToBytes(data);
+
+    var _this = {};
+
+    _this.getMode = function() {
+      return _mode;
+    };
+
+    _this.getLength = function(buffer) {
+      return ~~(_bytes.length / 2);
+    };
+
+    _this.write = function(buffer) {
+
+      var data = _bytes;
+
+      var i = 0;
+
+      while (i + 1 < data.length) {
+
+        var c = ( (0xff & data[i]) << 8) | (0xff & data[i + 1]);
+
+        if (0x8140 <= c && c <= 0x9FFC) {
+          c -= 0x8140;
+        } else if (0xE040 <= c && c <= 0xEBBF) {
+          c -= 0xC140;
+        } else {
+          throw 'illegal char at ' + (i + 1) + '/' + c;
+        }
+
+        c = ( (c >>> 8) & 0xff) * 0xC0 + (c & 0xff);
+
+        buffer.put(c, 13);
+
+        i += 2;
+      }
+
+      if (i < data.length) {
+        throw 'illegal char at ' + (i + 1);
+      }
+    };
+
+    return _this;
+  };
+
+  //=====================================================================
+  // GIF Support etc.
+  //
+
+  //---------------------------------------------------------------------
+  // byteArrayOutputStream
+  //---------------------------------------------------------------------
+
+  var byteArrayOutputStream = function() {
+
+    var _bytes = [];
+
+    var _this = {};
+
+    _this.writeByte = function(b) {
+      _bytes.push(b & 0xff);
+    };
+
+    _this.writeShort = function(i) {
+      _this.writeByte(i);
+      _this.writeByte(i >>> 8);
+    };
+
+    _this.writeBytes = function(b, off, len) {
+      off = off || 0;
+      len = len || b.length;
+      for (var i = 0; i < len; i += 1) {
+        _this.writeByte(b[i + off]);
+      }
+    };
+
+    _this.writeString = function(s) {
+      for (var i = 0; i < s.length; i += 1) {
+        _this.writeByte(s.charCodeAt(i) );
+      }
+    };
+
+    _this.toByteArray = function() {
+      return _bytes;
+    };
+
+    _this.toString = function() {
+      var s = '';
+      s += '[';
+      for (var i = 0; i < _bytes.length; i += 1) {
+        if (i > 0) {
+          s += ',';
+        }
+        s += _bytes[i];
+      }
+      s += ']';
+      return s;
+    };
+
+    return _this;
+  };
+
+  //---------------------------------------------------------------------
+  // base64EncodeOutputStream
+  //---------------------------------------------------------------------
+
+  var base64EncodeOutputStream = function() {
+
+    var _buffer = 0;
+    var _buflen = 0;
+    var _length = 0;
+    var _base64 = '';
+
+    var _this = {};
+
+    var writeEncoded = function(b) {
+      _base64 += String.fromCharCode(encode(b & 0x3f) );
+    };
+
+    var encode = function(n) {
+      if (n < 0) {
+        // error.
+      } else if (n < 26) {
+        return 0x41 + n;
+      } else if (n < 52) {
+        return 0x61 + (n - 26);
+      } else if (n < 62) {
+        return 0x30 + (n - 52);
+      } else if (n == 62) {
+        return 0x2b;
+      } else if (n == 63) {
+        return 0x2f;
+      }
+      throw 'n:' + n;
+    };
+
+    _this.writeByte = function(n) {
+
+      _buffer = (_buffer << 8) | (n & 0xff);
+      _buflen += 8;
+      _length += 1;
+
+      while (_buflen >= 6) {
+        writeEncoded(_buffer >>> (_buflen - 6) );
+        _buflen -= 6;
+      }
+    };
+
+    _this.flush = function() {
+
+      if (_buflen > 0) {
+        writeEncoded(_buffer << (6 - _buflen) );
+        _buffer = 0;
+        _buflen = 0;
+      }
+
+      if (_length % 3 != 0) {
+        // padding
+        var padlen = 3 - _length % 3;
+        for (var i = 0; i < padlen; i += 1) {
+          _base64 += '=';
+        }
+      }
+    };
+
+    _this.toString = function() {
+      return _base64;
+    };
+
+    return _this;
+  };
+
+  //---------------------------------------------------------------------
+  // base64DecodeInputStream
+  //---------------------------------------------------------------------
+
+  var base64DecodeInputStream = function(str) {
+
+    var _str = str;
+    var _pos = 0;
+    var _buffer = 0;
+    var _buflen = 0;
+
+    var _this = {};
+
+    _this.read = function() {
+
+      while (_buflen < 8) {
+
+        if (_pos >= _str.length) {
+          if (_buflen == 0) {
+            return -1;
+          }
+          throw 'unexpected end of file./' + _buflen;
+        }
+
+        var c = _str.charAt(_pos);
+        _pos += 1;
+
+        if (c == '=') {
+          _buflen = 0;
+          return -1;
+        } else if (c.match(/^\s$/) ) {
+          // ignore if whitespace.
+          continue;
+        }
+
+        _buffer = (_buffer << 6) | decode(c.charCodeAt(0) );
+        _buflen += 6;
+      }
+
+      var n = (_buffer >>> (_buflen - 8) ) & 0xff;
+      _buflen -= 8;
+      return n;
+    };
+
+    var decode = function(c) {
+      if (0x41 <= c && c <= 0x5a) {
+        return c - 0x41;
+      } else if (0x61 <= c && c <= 0x7a) {
+        return c - 0x61 + 26;
+      } else if (0x30 <= c && c <= 0x39) {
+        return c - 0x30 + 52;
+      } else if (c == 0x2b) {
+        return 62;
+      } else if (c == 0x2f) {
+        return 63;
+      } else {
+        throw 'c:' + c;
+      }
+    };
+
+    return _this;
+  };
+
+  //---------------------------------------------------------------------
+  // gifImage (B/W)
+  //---------------------------------------------------------------------
+
+  var gifImage = function(width, height) {
+
+    var _width = width;
+    var _height = height;
+    var _data = new Array(width * height);
+
+    var _this = {};
+
+    _this.setPixel = function(x, y, pixel) {
+      _data[y * _width + x] = pixel;
+    };
+
+    _this.write = function(out) {
+
+      //---------------------------------
+      // GIF Signature
+
+      out.writeString('GIF87a');
+
+      //---------------------------------
+      // Screen Descriptor
+
+      out.writeShort(_width);
+      out.writeShort(_height);
+
+      out.writeByte(0x80); // 2bit
+      out.writeByte(0);
+      out.writeByte(0);
+
+      //---------------------------------
+      // Global Color Map
+
+      // black
+      out.writeByte(0x00);
+      out.writeByte(0x00);
+      out.writeByte(0x00);
+
+      // white
+      out.writeByte(0xff);
+      out.writeByte(0xff);
+      out.writeByte(0xff);
+
+      //---------------------------------
+      // Image Descriptor
+
+      out.writeString(',');
+      out.writeShort(0);
+      out.writeShort(0);
+      out.writeShort(_width);
+      out.writeShort(_height);
+      out.writeByte(0);
+
+      //---------------------------------
+      // Local Color Map
+
+      //---------------------------------
+      // Raster Data
+
+      var lzwMinCodeSize = 2;
+      var raster = getLZWRaster(lzwMinCodeSize);
+
+      out.writeByte(lzwMinCodeSize);
+
+      var offset = 0;
+
+      while (raster.length - offset > 255) {
+        out.writeByte(255);
+        out.writeBytes(raster, offset, 255);
+        offset += 255;
+      }
+
+      out.writeByte(raster.length - offset);
+      out.writeBytes(raster, offset, raster.length - offset);
+      out.writeByte(0x00);
+
+      //---------------------------------
+      // GIF Terminator
+      out.writeString(';');
+    };
+
+    var bitOutputStream = function(out) {
+
+      var _out = out;
+      var _bitLength = 0;
+      var _bitBuffer = 0;
+
+      var _this = {};
+
+      _this.write = function(data, length) {
+
+        if ( (data >>> length) != 0) {
+          throw 'length over';
+        }
+
+        while (_bitLength + length >= 8) {
+          _out.writeByte(0xff & ( (data << _bitLength) | _bitBuffer) );
+          length -= (8 - _bitLength);
+          data >>>= (8 - _bitLength);
+          _bitBuffer = 0;
+          _bitLength = 0;
+        }
+
+        _bitBuffer = (data << _bitLength) | _bitBuffer;
+        _bitLength = _bitLength + length;
+      };
+
+      _this.flush = function() {
+        if (_bitLength > 0) {
+          _out.writeByte(_bitBuffer);
+        }
+      };
+
+      return _this;
+    };
+
+    var getLZWRaster = function(lzwMinCodeSize) {
+
+      var clearCode = 1 << lzwMinCodeSize;
+      var endCode = (1 << lzwMinCodeSize) + 1;
+      var bitLength = lzwMinCodeSize + 1;
+
+      // Setup LZWTable
+      var table = lzwTable();
+
+      for (var i = 0; i < clearCode; i += 1) {
+        table.add(String.fromCharCode(i) );
+      }
+      table.add(String.fromCharCode(clearCode) );
+      table.add(String.fromCharCode(endCode) );
+
+      var byteOut = byteArrayOutputStream();
+      var bitOut = bitOutputStream(byteOut);
+
+      // clear code
+      bitOut.write(clearCode, bitLength);
+
+      var dataIndex = 0;
+
+      var s = String.fromCharCode(_data[dataIndex]);
+      dataIndex += 1;
+
+      while (dataIndex < _data.length) {
+
+        var c = String.fromCharCode(_data[dataIndex]);
+        dataIndex += 1;
+
+        if (table.contains(s + c) ) {
+
+          s = s + c;
+
+        } else {
+
+          bitOut.write(table.indexOf(s), bitLength);
+
+          if (table.size() < 0xfff) {
+
+            if (table.size() == (1 << bitLength) ) {
+              bitLength += 1;
+            }
+
+            table.add(s + c);
+          }
+
+          s = c;
+        }
+      }
+
+      bitOut.write(table.indexOf(s), bitLength);
+
+      // end code
+      bitOut.write(endCode, bitLength);
+
+      bitOut.flush();
+
+      return byteOut.toByteArray();
+    };
+
+    var lzwTable = function() {
+
+      var _map = {};
+      var _size = 0;
+
+      var _this = {};
+
+      _this.add = function(key) {
+        if (_this.contains(key) ) {
+          throw 'dup key:' + key;
+        }
+        _map[key] = _size;
+        _size += 1;
+      };
+
+      _this.size = function() {
+        return _size;
+      };
+
+      _this.indexOf = function(key) {
+        return _map[key];
+      };
+
+      _this.contains = function(key) {
+        return typeof _map[key] != 'undefined';
+      };
+
+      return _this;
+    };
+
+    return _this;
+  };
+
+  var createDataURL = function(width, height, getPixel) {
+    var gif = gifImage(width, height);
+    for (var y = 0; y < height; y += 1) {
+      for (var x = 0; x < width; x += 1) {
+        gif.setPixel(x, y, getPixel(x, y) );
+      }
+    }
+
+    var b = byteArrayOutputStream();
+    gif.write(b);
+
+    var base64 = base64EncodeOutputStream();
+    var bytes = b.toByteArray();
+    for (var i = 0; i < bytes.length; i += 1) {
+      base64.writeByte(bytes[i]);
+    }
+    base64.flush();
+
+    return 'data:image/gif;base64,' + base64;
+  };
+
+  //---------------------------------------------------------------------
+  // returns qrcode function.
+
+  return qrcode;
+}();
+
+// multibyte support
+!function() {
+
+  qrcode.stringToBytesFuncs['UTF-8'] = function(s) {
+    // http://stackoverflow.com/questions/18729405/how-to-convert-utf8-string-to-byte-array
+    function toUTF8Array(str) {
+      var utf8 = [];
+      for (var i=0; i < str.length; i++) {
+        var charcode = str.charCodeAt(i);
+        if (charcode < 0x80) utf8.push(charcode);
+        else if (charcode < 0x800) {
+          utf8.push(0xc0 | (charcode >> 6),
+              0x80 | (charcode & 0x3f));
+        }
+        else if (charcode < 0xd800 || charcode >= 0xe000) {
+          utf8.push(0xe0 | (charcode >> 12),
+              0x80 | ((charcode>>6) & 0x3f),
+              0x80 | (charcode & 0x3f));
+        }
+        // surrogate pair
+        else {
+          i++;
+          // UTF-16 encodes 0x10000-0x10FFFF by
+          // subtracting 0x10000 and splitting the
+          // 20 bits of 0x0-0xFFFFF into two halves
+          charcode = 0x10000 + (((charcode & 0x3ff)<<10)
+            | (str.charCodeAt(i) & 0x3ff));
+          utf8.push(0xf0 | (charcode >>18),
+              0x80 | ((charcode>>12) & 0x3f),
+              0x80 | ((charcode>>6) & 0x3f),
+              0x80 | (charcode & 0x3f));
+        }
+      }
+      return utf8;
+    }
+    return toUTF8Array(s);
+  };
+
+}();
+
+(function (factory) {
+  if (typeof define === 'function' && define.amd) {
+      define([], factory);
+  } else if (typeof exports === 'object') {
+      module.exports = factory();
+  }
+}(function () {
+    return qrcode;
+}));
+
+;
+/* First-run state and explicit device-local evidence. Reports use an allowlist, never raw logs. */
+(function(root,factory){var api=factory();if(typeof module==='object'&&module.exports)module.exports=api;else root.ApexSetupChecks=api;}(typeof window!=='undefined'?window:globalThis,function(){
+'use strict';
+var KEY='apex-setup-v1',phases=['welcome','account','video','home','done'],outcomes=['untested','confirmed','no-picture','no-audio','cancelled','preview','failed'];
+function safe(value,max){var text=String(value||'');return /^[A-Za-z0-9 ._+\/-]*$/.test(text)&&text.length<=(max||80)?text:'';}
+function identity(raw){raw=raw||{};return{version:safe(raw.version,24),revision:/^[a-f0-9]{24}$/.test(raw.revision||'')?raw.revision:'',model:safe(raw.model),firmware:safe(raw.firmware),tizen:/^\d+(?:\.\d+){0,3}$/.test(raw.tizen||'')?raw.tizen:'',preview:raw.preview===true};}
+function key(runtime){var r=identity(runtime);return[r.version,r.revision,r.model,r.firmware,r.preview?'preview':'tv'].join('|');}
+function empty(){return{version:1,phase:'welcome',deferred:false,home:'untested',tests:{}};}
+function clean(raw){var value=empty();if(!raw||raw.version!==1)return value;if(phases.indexOf(raw.phase)>=0)value.phase=raw.phase;value.deferred=raw.deferred===true;if(['confirmed','skipped'].indexOf(raw.home)>=0)value.home=raw.home;['basic','f1'].forEach(function(kind){var t=raw.tests&&raw.tests[kind];if(!t||outcomes.indexOf(t.outcome)<0||typeof t.identity!=='string'||t.identity.length>220)return;value.tests[kind]={outcome:t.outcome,identity:t.identity,at:Number.isSafeInteger(t.at)&&t.at>=0?t.at:0,progressObserved:t.progressObserved===true,ordinaryLicenseObserved:t.ordinaryLicenseObserved===true};});return value;}
+function store(storage,now){now=now||Date.now;var state=empty(),writable=Boolean(storage);try{var raw=storage&&storage.getItem(KEY);if(raw&&raw.length<8192)state=clean(JSON.parse(raw));}catch(_){writable=false;}function save(){try{if(storage){storage.setItem(KEY,JSON.stringify(state));writable=true;}}catch(_){writable=false;}}return{
+state:function(){return clean(state);},writable:function(){return writable;},
+start:function(){state.phase='welcome';state.deferred=false;save();},
+phase:function(p){if(phases.indexOf(p)>=0){state.phase=p;state.deferred=false;save();}},
+defer:function(){state.deferred=true;save();},
+clearAccount:function(){delete state.tests.f1;save();},
+home:function(added){state.home=added?'confirmed':'skipped';state.phase='done';state.deferred=false;save();},
+test:function(kind,outcome,runtime,evidence){if(['basic','f1'].indexOf(kind)<0||outcomes.indexOf(outcome)<0)return;evidence=evidence||{};state.tests[kind]={outcome:runtime.preview?'preview':outcome,identity:key(runtime),at:now(),progressObserved:evidence.progressObserved===true,ordinaryLicenseObserved:evidence.ordinaryLicenseObserved===true};save();},
+evidence:function(kind,runtime){var t=state.tests[kind];return t&&t.identity===key(runtime)?clean(state).tests[kind]:null;}
+};}
+function platform(runtime){var r=identity(runtime),major=Number(r.tizen.split('.')[0]);if(r.preview)return'preview';if(!runtime.avplay||major&&major<6)return'unsupported';return major>=6?'ready':'unknown';}
+function failureCode(raw){var m=String(raw&&raw.message||raw||''),http=m.match(/HTTP\s*(\d{3})/i);if(http)return'HTTP_'+http[1];var player=m.match(/\bPLAYER_ERROR_[A-Z_]{1,60}\b/);if(player)return player[0];return/network|timeout|connection|nepasieki|nutrūko/i.test(m)?'NETWORK':'UNKNOWN';}
+function report(runtime,state,catalogue,now){var r=identity(runtime),stored=clean(state),checks={},p=platform(runtime);checks.platform=p;checks.network=runtime.online===false?'offline':'not-measured';checks.account=runtime.signedIn===true?'signed-in':'sign-in-required';checks.catalogue=['ready','failed','sign-in-required','untested'].indexOf(catalogue&&catalogue.status)>=0?catalogue.status:'untested';if(checks.catalogue==='ready')checks.network='f1-reachable';if(r.preview){checks.network='preview';checks.catalogue='preview';}var error=catalogue&&catalogue.error;if(error&&/^(?:HTTP_\d{3}|PLAYER_ERROR_[A-Z_]{1,60}|NETWORK|UNKNOWN)$/.test(error))checks.failure=error;['basic','f1'].forEach(function(kind){var t=stored.tests[kind];checks[kind+'PictureAndAudio']=t&&t.identity===key(runtime)?t.outcome:'untested';if(kind==='f1')checks.ordinaryF1License=t&&t.identity===key(runtime)&&t.ordinaryLicenseObserved?'observed':'unverified';});var result=p==='preview'?'preview':p==='unsupported'?'unsupported':p==='unknown'?'needs-device-check':checks.f1PictureAndAudio==='confirmed'?'f1-playback-confirmed':'needs-playback-test';return{schema:1,app:'Apex TV',generatedAt:new Date(now===undefined?Date.now():now).toISOString(),version:r.version,revision:r.revision,device:{model:r.model||'unavailable',firmware:r.firmware||'unavailable',tizen:r.tizen||'unavailable'},result:result,checks:checks,homeShortcut:stored.home,licenseRotation:'unverified'};}
+return{store:store,identity:identity,platform:platform,report:report,failureCode:failureCode};
+}));
+
+;
 /* UI text only. No account, player, CDM, network or recurring DOM polling. */
 (function(root,factory){var api=factory(root);if(typeof module==='object'&&module.exports)module.exports=api;else root.ApexI18n=api;}(typeof window!=='undefined'?window:globalThis,function(root){
   'use strict';
   var EN={
+  "Treniruotė": "Practice",
+  "· vietos laiku.": "· local time.",
+  "Mėgstamą lenktynininką pasieksi grotuvo skiltyje Daugiau. Kamerą parenkame iš konkrečios sesijos F1 sąrašo.": "Open More in the player to choose your favorite driver. F1 must offer the camera for the current session.",
+  "Garsas": "Audio",
+  "Kameros / POV": "Cameras / POV",
   "Rasta:": "Found:",
   "Sustabdyti vaizdą": "Pause playback",
   "F1 Live pasirenkamas automatiškai. International ir kitas kalbas gali pasirinkti ranka. Pakeitimas gali užtrukti kelias sekundes.": "F1 Live is selected automatically. Choose International or another language manually. Switching can take a few seconds.",
@@ -479,6 +2833,26 @@
 }));
 
 ;
+/* Remote timeline selection is a draft until OK. No player calls or network work while sliding. */
+(function(root,factory){var api=factory();if(typeof module==='object'&&module.exports)module.exports=api;else root.ApexTimeline=api;}(typeof window!=='undefined'?window:globalThis,function(){
+'use strict';
+function bounds(raw){if(!raw||!Number.isFinite(raw.start)||!Number.isFinite(raw.end)||raw.start<0||raw.end<=raw.start||raw.end-raw.start>604800)return null;return{start:raw.start,end:raw.end,live:raw.live===true};}
+function clamp(value,r){return Math.max(r.start,Math.min(r.end,value));}
+function controller(){var r=null,draft=0,dirty=false,direction=0,started=0,lastAt=-Infinity;
+return{
+begin:function(range,position){r=bounds(range);if(!r||!Number.isFinite(position)){r=null;return false;}draft=clamp(position,r);dirty=false;direction=0;lastAt=-Infinity;return true;},
+active:function(){return Boolean(r);},
+snapshot:function(){return r?{start:r.start,end:r.end,live:r.live,position:draft,dirty:dirty}:null;},
+sync:function(position){if(r&&!dirty&&Number.isFinite(position))draft=clamp(position,r);},
+move:function(dir,at){if(!r||(dir!==-1&&dir!==1)||!Number.isFinite(at))return null;if(dir!==direction||at-lastAt>250||at<lastAt){direction=dir;started=at;}lastAt=at;var held=at-started,step=held>=3500?60:held>=1800?30:held>=600?10:5,next=clamp(draft+dir*step,r);if(next!==draft)dirty=true;draft=next;return draft;},
+fraction:function(value){if(!r||!Number.isFinite(value))return null;var next=r.start+(r.end-r.start)*Math.max(0,Math.min(1,value));if(next!==draft)dirty=true;draft=next;direction=0;return draft;},
+commit:function(latest){var current=bounds(latest),selected=r&&dirty&&current?clamp(draft,current):null;r=null;dirty=false;direction=0;return selected;},
+cancel:function(){r=null;dirty=false;direction=0;}
+};}
+return{controller:controller};
+}));
+
+;
 /* Small, bounded UI work for Samsung's TV web engine. No player or DRM access. */
 (function (global) {
   'use strict';
@@ -561,7 +2935,7 @@
 }(typeof window !== 'undefined' ? window : globalThis));
 ;
 /* Service-supplied catalogue metadata, global F1 search and weekend schedule. */
-(function(root,factory){var api=factory();if(typeof module==='object'&&module.exports)module.exports=api;else root.ApexDiscovery=api;}(typeof window!=='undefined'?window:globalThis,function(){
+(function(root,factory){var api=factory(root);if(typeof module==='object'&&module.exports)module.exports=api;else root.ApexDiscovery=api;}(typeof window!=='undefined'?window:globalThis,function(root){
   'use strict';var ORIGIN='https://f1tv.formula1.com';
   function clean(v,n){return String(v||'').replace(/[\x00-\x1f\x7f]/g,'').trim().slice(0,n||240);}
   function date(v){if(v===0||v===null||v===undefined||v==='')return 0;var n=typeof v==='number'?v: /^\d{10,13}$/.test(String(v))?Number(v):Date.parse(v);if(n>1000000000&&n<100000000000)n*=1000;return Number.isFinite(n)&&n>=Date.UTC(1950,0,1)&&n<=Date.UTC(2101,0,1)?n:0;}
@@ -592,7 +2966,7 @@
     }()).finally(function(){pending=null;});return pending;}
     return{search:function(q){return search(client,q);},weekend:async function(){var values=await Promise.all([loadProgram(),client.live()]),calendar=values[0],live=values[1],now=clock();return{meeting:calendar.meeting,sessions:program(calendar.items,now,live,calendar.meeting),live:live,at:now,timeZone:'Europe/Vilnius'};},clear:function(){cached=null;}};
   }
-  function localTime(raw,day){var value=date(raw);if(!value)return 'Laikas nepateiktas';try{return new Intl.DateTimeFormat(global.ApexI18n?global.ApexI18n.locale():'lt-LT',{timeZone:global.ApexI18n?global.ApexI18n.timeZone():'Europe/Vilnius',weekday:day?'short':undefined,month:day?'short':undefined,day:day?'numeric':undefined,hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date(value));}catch(_){return new Date(value).toLocaleString(global.ApexI18n?global.ApexI18n.locale():'lt-LT');}}
+  function localTime(raw,day){var value=date(raw);if(!value)return 'Laikas nepateiktas';try{return new Intl.DateTimeFormat(root.ApexI18n?root.ApexI18n.locale():'lt-LT',{timeZone:root.ApexI18n?root.ApexI18n.timeZone():'Europe/Vilnius',weekday:day?'short':undefined,month:day?'short':undefined,day:day?'numeric':undefined,hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date(value));}catch(_){return new Date(value).toLocaleString(root.ApexI18n?root.ApexI18n.locale():'lt-LT');}}
   return{normalize:normalize,picture:picture,date:date,query:query,search:search,chooseMeeting:chooseMeeting,program:program,create:create,localTime:localTime};
 }));
 ;
@@ -2612,6 +4986,7 @@ window.ApexProtectionProbe = {
   function diagnostic(event, extra) {
     var data = { event: event, revision: ctx.revision, shell: '1', playbackKind: playbackKind };
     Object.keys(extra || {}).forEach(function (key) { data[key] = extra[key]; });
+    if(typeof setupProbe!=='undefined'&&setupProbe&&setupProbe.kind==='f1'&&/^(drm_license_installed|browser_license_installed)$/.test(event)&&!(extra&&extra.error))setupProbe.ordinaryLicenseObserved=true;
     if (ctx.standalone && window.ApexStandalone) { window.ApexStandalone.request('/api/diagnostics', 'POST', data).catch(function () {}); if (!ctx.monitor) return; }
     request('/api/diagnostics', 'POST', data).catch(function () {});
   }
@@ -2760,6 +5135,36 @@ window.ApexProtectionProbe = {
   function saveQuality(value){preferredQuality=Quality.mode(value);try{localStorage.setItem('apex-video-quality',preferredQuality);}catch(_){}}
   var Views=window.ApexViewOptions, viewBusy=false, preferredAudioLanguage="";
   try{var savedAudioLanguage=localStorage.getItem("apex-audio-language");preferredAudioLanguage=savedAudioLanguage?Views.language(savedAudioLanguage):"";}catch(_){}
+  var scrubber=window.ApexTimeline.controller(),scrubPaintFrame=0;
+  function scrubRange(sample){if(!sample)return null;if(playbackKind==='live'){var live=getLiveWindow(sample.position);return live&&live.edge>live.start?{start:live.start,end:live.edge,live:true}:null;}return sample.duration>1?{start:0,end:Math.max(0,sample.duration-1),live:false}:null;}
+  function startScrub(){if(!playing||seekBusy||viewBusy)return false;var m=lastMetrics||metrics();return scrubber.begin(scrubRange(m),m&&m.position);}
+  function cancelScrub(){scrubber.cancel();if(scrubPaintFrame&&window.cancelAnimationFrame)window.cancelAnimationFrame(scrubPaintFrame);scrubPaintFrame=0;var line=document.getElementById('player-timeline');if(line){line.classList.remove('scrub-draft');line.setAttribute('aria-valuetext',lastMetrics?UX.time(lastMetrics.position):'');}}
+  function paintScrub(){
+    scrubPaintFrame=0;if(!playing||overlay.hidden)return;var selection=scrubber.snapshot();if(!selection)return;
+    var line=document.getElementById('player-timeline'),fraction=(selection.position-selection.start)/(selection.end-selection.start);
+    if(!line)return;UI.style(line.firstChild,'transform','scaleX('+fraction.toFixed(6)+')');var marker=line.querySelector('.scrub-marker');if(marker)UI.style(marker,'transform','translateX('+(fraction*100).toFixed(4)+'%)');
+    UI.attr(line,'aria-valuemin',String(Math.floor(selection.start)));UI.attr(line,'aria-valuemax',String(Math.floor(selection.end)));UI.attr(line,'aria-valuenow',String(Math.round(selection.position)));UI.attr(line,'aria-valuetext',UX.time(selection.position));
+    line.classList.toggle('scrub-draft',selection.dirty);
+    UI.text(document.getElementById('player-elapsed'),UX.time(selection.position));
+    UI.text(document.getElementById('player-remaining'),selection.dirty?setupText('OK · persukti  |  Atgal · atšaukti','OK · seek  |  Back · cancel'):setupText('← / → · pasirinkti laiką','← / → · select time'));
+  }
+  function scheduleScrubPaint(){if(scrubPaintFrame)return;if(window.requestAnimationFrame)scrubPaintFrame=window.requestAnimationFrame(paintScrub);else{scrubPaintFrame=1;setTimeout(paintScrub,16);}}
+  function moveScrub(direction){if(seekBusy||viewBusy)return;if(!scrubber.active()&&!startScrub())return;scrubber.move(direction,Date.now());scheduleScrubPaint();}
+  function commitScrub(){
+    if(seekBusy||viewBusy||!playing)return;var m=metrics()||lastMetrics,target=scrubber.commit(scrubRange(m));cancelScrub();if(target===null)return;
+    if(activeEngine==='AVPlay'){nativeSeek(target,function(e){if(!e&&lastMetrics){lastMetrics.position=target;savePlayback();}if(!overlay.hidden)updatePlayer();});}
+    else{try{video.currentTime=target;updatePlayer();}catch(_){document.getElementById('player-state').textContent=setupText('Persukti nepavyko. Bandyk dar kartą.','Seek failed. Try again.');}}
+  }
+  function focusScrub(){var line=document.getElementById('player-timeline');if(line&&!line.hidden&&startScrub()){line.focus();scheduleScrubPaint();return true;}return false;}
+  function timelineKey(key){
+    var line=document.getElementById('player-timeline');if(document.activeElement!==line||overlay.hidden)return false;
+    if(key===37||key===39){moveScrub(key===37?-1:1);return true;}
+    if(key===13){commitScrub();return true;}
+    if(key===40){cancelScrub();document.getElementById('play-pause').focus();updatePlayer();return true;}
+    if(key===38)return true;return false;
+  }
+
+
   function applyPreferences() {
     var p = localStore.state().preferences;
     document.body.classList.toggle('large-text', p.largeText); document.body.classList.toggle('high-contrast', p.highContrast);document.body.classList.toggle('reduce-motion',p.reduceMotion);if(p.reduceMotion)motion.cancel();
@@ -2832,7 +5237,7 @@ window.ApexProtectionProbe = {
   }
   function updateHomeFeature(main,data){
     var hero=main.querySelector('.tv-hero');if(!hero||!hero.homeModel)return;var model=hero.homeModel,item=(data.sessions||[]).filter(function(i){return i.live;})[0]||(data.live||[]).filter(function(i){return (!i.series||/formula\s*1|^f1$/i.test(i.series))&&!/\bkids\b/i.test(i.title);})[0]||model.continuing||data.meeting;if(!item)return;var available=(data.sessions||[]).filter(function(i){return i.playable&&i.state==='replay';}),latest=available[available.length-1],nextSession=(data.sessions||[]).filter(function(i){return i.state==='upcoming';})[0];model.feature=item===data.meeting?(latest||null):item;
-    I18n.setText(model.title, compactTitle(item.kind==='video'?item.title:item.subtitle||item.title));I18n.setText(model.eyebrow, item.live?'DABAR TIESIOGIAI':model.continuing===item?'TĘSK TEN, KUR SUSTOJAI':'FORMULA 1 · ŠIS SAVAITGALIS');I18n.setText(model.description, item.live?'Pagrindinė transliacija, lenktynininkų kameros ir tavo pasirinktas garsas.':model.continuing===item?'Išsaugota vieta · '+UX.time(item.position):'Visos sesijos vienoje vietoje. Laikai rodomi tavo televizoriaus laiko juostoje.');I18n.setText(model.watch, item.live?'Žiūrėti tiesiogiai':item.kind==='video'?'Tęsti žiūrėjimą':latest?'Žiūrėti '+(/qualifying|kvalifikacija/i.test(latest.title)?'kvalifikaciją':/sprint/i.test(latest.title)?'sprintą':/race|grand prix|lenktyn/i.test(latest.title)?'lenktynes':'paskutinę sesiją'):'Žiūrėti įrašus');if(item===data.meeting&&nextSession)I18n.setText(model.description, 'Artimiausia sesija · '+Discovery.localTime(nextSession.start,true)+' · Lietuvos laiku.');
+    I18n.setText(model.title, compactTitle(item.kind==='video'?item.title:item.subtitle||item.title));I18n.setText(model.eyebrow, item.live?'DABAR TIESIOGIAI':model.continuing===item?'TĘSK TEN, KUR SUSTOJAI':'FORMULA 1 · ŠIS SAVAITGALIS');I18n.setText(model.description, item.live?'Pagrindinė transliacija, lenktynininkų kameros ir tavo pasirinktas garsas.':model.continuing===item?'Išsaugota vieta · '+UX.time(item.position):'Visos sesijos vienoje vietoje. Laikai rodomi tavo televizoriaus laiko juostoje.');I18n.setText(model.watch, item.live?'Žiūrėti tiesiogiai':item.kind==='video'?'Tęsti žiūrėjimą':latest?'Žiūrėti '+(/qualifying|kvalifikacija/i.test(latest.title)?'kvalifikaciją':/sprint/i.test(latest.title)?'sprintą':/race|grand prix|lenktyn/i.test(latest.title)?'lenktynes':'paskutinę sesiją'):'Žiūrėti įrašus');if(item===data.meeting&&nextSession)I18n.setText(model.description, 'Artimiausia sesija · '+Discovery.localTime(nextSession.start,true)+' · vietos laiku.');
     var artwork=Discovery.picture(item.image||(item===data.meeting?data.meeting.image:'')),old=hero.querySelector('.content-image');if(artwork&&(!old||old.getAttribute('data-artwork')!==artwork)){if(old)old.remove();imageArtwork(hero,artwork,true);}else if(!artwork&&old){old.remove();var fallback=hero.querySelector('.graphic-art');if(fallback)fallback.style.visibility='';}
   }
   function renderWeekend(main){
@@ -2849,7 +5254,7 @@ window.ApexProtectionProbe = {
     if(!current.searchResults){var tips=node('div','','search-suggestions');['Singapore','Monaco','2025','Sprint'].forEach(function(term){tips.appendChild(focusKey(button(term,function(){input.value=term;form.onsubmit({preventDefault:function(){}});},'secondary-button'),'search-'+term));});box.appendChild(tips);}
   }
   function driverPreferences(main){
-    var section=node('section','','settings-section'),preferred=driverStore.get();section.appendChild(node('h2','Tavo lenktynininkas'));section.appendChild(node('p','Mėgstamą lenktynininką pasieksi vienu grotuvo mygtuku. Kamerą parenkame iš konkrečios sesijos F1 sąrašo.'));section.appendChild(focusKey(button(preferred?'★ '+preferred.name:'Pasirinkti lenktynininką',function(){chooseFavoriteDriver();},'secondary-button'),'settings-driver'));main.appendChild(section);
+    var section=node('section','','settings-section'),preferred=driverStore.get();section.appendChild(node('h2','Tavo lenktynininkas'));section.appendChild(node('p','Mėgstamą lenktynininką pasieksi grotuvo skiltyje Daugiau. Kamerą parenkame iš konkrečios sesijos F1 sąrašo.'));section.appendChild(focusKey(button(preferred?'★ '+preferred.name:'Pasirinkti lenktynininką',function(){chooseFavoriteDriver();},'secondary-button'),'settings-driver'));main.appendChild(section);
   }
   function availableCameras(item){var route='/api/channels?id='+encodeURIComponent(item.id),saved=catalogueCache.get(route,120000);return(saved?Promise.resolve({channels:saved.items}):request(route)).then(function(data){var values=Views.channels(data);catalogueCache.put(route,values);driverStore.observe(values);return values;});}
   function chooseFavoriteDriver(channels){
@@ -2942,8 +5347,113 @@ window.ApexProtectionProbe = {
     var section=node('section','','settings-section');section.appendChild(node('h2','Programėlės kalba'));section.appendChild(node('p','Pasirink meniu ir grotuvo valdiklių kalbą. Komentavimas pasirenkamas atskirai.'));
     var choice=focusKey(button(I18n.language()==='en'?'English':'Lietuvių',function(){dialog('Programėlės kalba','Lietuvių / English',[{label:'Grįžti',default:true},{label:(I18n.language()==='lt'?'✓ ':'')+'Lietuvių',run:function(){I18n.setLanguage('lt');render();}},{label:(I18n.language()==='en'?'✓ ':'')+'English',run:function(){I18n.setLanguage('en');render();}}]);},'secondary-button'),'settings-ui-language');section.appendChild(choice);main.appendChild(section);
   }
+  var Setup=window.ApexSetupChecks,setupStorage=null;
+  try{setupStorage=window.localStorage;}catch(_){}
+  var setupStore=Setup.store(setupStorage),setupProbe=null,setupCaptureF1=false,setupCatalogue={status:'untested'},setupCheckBusy=false;
+  function setupText(lt,en){var i=window.ApexI18n;return(i&&i.language?i.language():document.documentElement.lang)==='en'?en:lt;}
+  function setupRuntime(){var p=productInfo();return{version:ctx.version,revision:ctx.revision,model:p.model,firmware:p.firmware,tizen:p.tizen,preview:ctx.preview===true,avplay:Boolean(nativePlayer&&nativePlayer.prepareAsync&&nativePlayer.setDrm),online:navigator.onLine!==false,signedIn:Boolean(account&&account.signedIn)};}
+  function openSetupPage(tab,title){rememberView();stack.push(current);current={tab:tab,title:title};render();}
+  function beginSetup(){setupCaptureF1=false;setupStore.start();openSetupPage('setup',setupText('Pirmas paleidimas','Getting started'));}
+  function setupPhase(phase){setupStore.phase(phase);render();}
+  function deferSetup(){setupCaptureF1=false;setupStore.defer();showTab('home',setupText('Pradžia','Home'));}
+  function setupButton(actions,lt,en,run,key,primary){var b=focusKey(button(setupText(lt,en),run,primary?'primary-button':'secondary-button'),key);actions.appendChild(b);return b;}
+  function renderSetup(main){
+    var phase=setupStore.state().phase;if(phase==='done')phase='welcome';
+    var card=node('section','','setup-card'),steps=node('ol','','setup-steps');
+    [['account','Prisijungimas','Sign in'],['video','Vaizdas ir garsas','Picture and sound'],['home','Samsung Home','Samsung Home']].forEach(function(entry,index){var li=node('li',String(index+1)+' · '+setupText(entry[1],entry[2]));if(phase===entry[0])li.setAttribute('aria-current','step');steps.appendChild(li);});card.appendChild(steps);
+    var actions=node('div','','settings-actions'),runtime=setupRuntime();
+    if(phase==='welcome'){
+      card.appendChild(node('h2',setupText('Pasiruošk žiūrėti','Ready for race day')));
+      card.appendChild(node('p',setupText('Prisijungsime prie F1 TV, patikrinsime vaizdą ir parodysime, kaip pridėti Apex TV prie Samsung Home.','Sign in to F1 TV, check picture and sound, then add Apex TV to Samsung Home.')));
+      card.appendChild(node('p',setupText('TV: ','TV: ')+(runtime.model||setupText('modelis nepasiekiamas','model unavailable'))+' · Apex TV '+runtime.version,'settings-note'));
+      setupButton(actions,'Pradėti','Get started',function(){setupPhase('account');},'setup-start',true).setAttribute('data-default-focus','true');
+    }else if(phase==='account'){
+      card.appendChild(node('h2',setupText('1. Prisijunk prie F1 TV','1. Sign in to F1 TV')));
+      card.appendChild(node('p',setupText('Naudok savo F1 TV paskyrą. Prisijungimas vyksta tiesiogiai televizoriuje.','Use your own F1 TV account. Sign-in runs directly on the TV.')));
+      renderTVAccount(card);
+      if(account&&account.signedIn)setupButton(actions,'Toliau: vaizdo patikra','Next: playback check',function(){setupPhase('video');},'setup-account-next',true).setAttribute('data-default-focus','true');
+      setupButton(actions,'← Ankstesnis žingsnis','← Previous step',function(){setupPhase('welcome');},'setup-account-back');
+    }else if(phase==='video'){
+      card.appendChild(node('h2',setupText('2. Patikrink vaizdą ir garsą','2. Check picture and sound')));
+      card.appendChild(node('p',setupText('Paleisk trumpą bandomąjį vaizdą. Grįžęs su Atgal nurodyk, ar matai judantį vaizdą ir girdi garsą.','Play the short test clip. Return with Back and confirm whether picture moves and sound is audible.')));
+      card.appendChild(node('p',setupText('Šis klipas patikrina grotuvą. Apsaugotą F1 transliaciją galima patikrinti papildomai suderinamumo ekrane.','This clip checks the player. Test protected F1 playback separately on the compatibility screen.'),'settings-note'));
+      var basic=setupStore.evidence('basic',runtime),passed=basic&&basic.outcome==='confirmed';
+      if(basic)card.appendChild(node('p',setupOutcome(basic.outcome),'setup-result'));
+      setupButton(actions,'Paleisti bandomąjį vaizdą','Play test clip',function(){startSetupProbe('basic');},'setup-video-test',true).setAttribute('data-default-focus','true');
+      var next=setupButton(actions,'Toliau: Samsung Home','Next: Samsung Home',function(){setupPhase('home');},'setup-video-next');next.disabled=!passed&&!ctx.preview;
+      setupButton(actions,'Praleisti patikrą','Skip playback check',function(){setupPhase('home');},'setup-video-skip');
+      setupButton(actions,'← Ankstesnis žingsnis','← Previous step',function(){setupPhase('account');},'setup-video-back');
+    }else if(phase==='home'){
+      card.appendChild(node('h2',setupText('3. Pasiek programėlę per Home','3. Find the app from Home')));
+      card.appendChild(node('p',setupText('Pultelyje paspausk namuką ir atlik šiuos veiksmus:','Press Home on the remote, then follow these steps:')));
+      var list=node('ol','','setup-home-list');
+      [setupText('Home → Apps → nustatymai (krumpliaratis).','Home → Apps → Settings (gear).'),setupText('Pasirink Apex TV → Pridėti prie pradžios ekrano / Add to Home.','Select Apex TV → Add to Home.'),setupText('Parink vietą juostoje ir spausk OK. Tada vėl atidaryk Apex TV.','Choose a position, press OK, then reopen Apex TV.')].forEach(function(text){list.appendChild(node('li',text));});card.appendChild(list);
+      card.appendChild(node('p',setupText('Vedlys išsaugo šį žingsnį. Jei Apex TV jau yra Home juostoje, gali iškart užbaigti.','This step is saved. If Apex TV is already on Home, you can finish now.'),'settings-note'));
+      setupButton(actions,'Pridėjau · užbaigti','Added to Home · finish',function(){setupStore.home(true);showTab('home','Pradžia');},'setup-home-done',true).setAttribute('data-default-focus','true');
+      setupButton(actions,'Pridėsiu vėliau','I will add it later',function(){setupStore.home(false);showTab('home','Pradžia');},'setup-home-skip');
+      setupButton(actions,'← Ankstesnis žingsnis','← Previous step',function(){setupPhase('video');},'setup-home-back');
+    }
+    setupButton(actions,'Tęsti vėliau','Continue later',deferSetup,'setup-defer');card.appendChild(actions);main.appendChild(card);
+    if(!setupStore.writable())main.appendChild(node('p',setupText('TV nepavyko išsaugoti vedlio. Šį kartą jį gali užbaigti, o vėliau atverti iš Nustatymų.','The TV could not save setup progress. You can finish now and reopen setup from Settings.'),'settings-note'));
+  }
+  function setupOutcome(code){var labels={failed:['Grotuvo patikra nepavyko','Playback check failed'],confirmed:['Vaizdas ir garsas patvirtinti','Picture and sound confirmed'],'no-picture':['Vaizdo nėra – patikrą reikia pakartoti','No picture – repeat the playback check'],'no-audio':['Garsas nepatvirtintas – patikrink TV garsą','Sound not confirmed – check TV volume'],cancelled:['Patikra nutraukta','Check cancelled'],preview:['Naršyklės maketas · tikro TV patikra dar neatlikta','Browser preview · physical TV not tested'],untested:['Dar nepatikrinta','Not tested yet']};var text=labels[code]||labels.untested;return setupText(text[0],text[1]);}
+  function startSetupProbe(kind){setupProbe={kind:kind,runtime:setupRuntime(),position:null,progressObserved:false,ordinaryLicenseObserved:false};demo();}
+  function finishSetupProbe(probe){
+    dialog(setupText('Ar yra vaizdas ir garsas?','Is there picture and sound?'),setupText('Pasirink pagal tai, ką pats matei ir girdėjai. Vien judantis laikrodis šios patikros neužbaigia.','Confirm what you actually saw and heard. A moving playback clock does not complete this check.'),[
+      {label:setupText('Bandymą nutraukiau','I cancelled the test'),default:true,run:function(){record('cancelled');}},
+      {label:setupText('Yra judantis vaizdas ir garsas','Moving picture and sound work'),run:function(){record('confirmed');}},
+      {label:setupText('Vaizdas yra, garso nėra','Picture works, no sound'),run:function(){record('no-audio');}},
+      {label:setupText('Vaizdo nėra','No picture'),run:function(){record('no-picture');}}
+    ]);
+    function record(outcome){setupStore.test(probe.kind,outcome,probe.runtime,probe);if(current.tab==='setup'||current.tab==='compatibility')render();else openSetupPage('compatibility',setupText('Suderinamumo patikra','Compatibility check'));}
+  }
+  function chooseF1Probe(){setupCaptureF1=true;setupProbe=null;showTab('archive','Įrašai');}
+  function setupReport(){return Setup.report(setupRuntime(),setupStore.state(),setupCatalogue);}
+  function reportResult(value){var messages={preview:['Tai naršyklės maketas, ne fizinio TV patikra.','Browser preview, not a physical TV check.'],unsupported:['Šio TV aplinka neatitinka grotuvo reikalavimų.','This TV environment does not meet player requirements.'],'needs-device-check':['TV platformos versija nepasiekiama. Reikia tikro atkūrimo bandymo.','TV platform version is unavailable. A playback test is needed.'],'f1-playback-confirmed':['Šiame TV vartotojas patvirtino F1 vaizdą ir garsą.','F1 picture and sound were confirmed on this TV.'],'needs-playback-test':['Dar reikia patvirtinti F1 vaizdą ir garsą šiame TV.','F1 picture and sound still need confirmation on this TV.']};return setupText.apply(null,messages[value]||messages['needs-playback-test']);}
+  function renderCompatibility(main){
+    var report=setupReport(),card=node('section','','setup-card'),rows=node('dl','','compatibility-list');
+    card.appendChild(node('h2',setupText('Tavo televizoriaus patikra','Your TV check')));card.appendChild(node('p',reportResult(report.result),'setup-result'));
+    function row(label,value){rows.appendChild(node('dt',label));rows.appendChild(node('dd',value));}
+    row(setupText('TV modelis','TV model'),(report.device.model==='unavailable'?setupText('Nepasiekiamas','Unavailable'):report.device.model));row('Firmware / Tizen',(report.device.firmware==='unavailable'?setupText('Nepasiekiama','Unavailable'):report.device.firmware)+' / '+(report.device.tizen==='unavailable'?setupText('nepasiekiama','unavailable'):report.device.tizen));row('Apex TV',report.version);
+    row(setupText('F1 ryšys','F1 connection'),ctx.preview?setupText('Naršyklės maketas','Browser preview'):setupCatalogue.status==='ready'?setupText('F1 katalogas pasiekiamas','F1 catalogue reachable'):setupCatalogue.status==='failed'?setupText('Patikra nepavyko: ','Check failed: ')+(setupCatalogue.error||'UNKNOWN'):setupText('Dar nepatikrinta','Not checked yet'));
+    row(setupText('Bandomasis vaizdas','Test clip'),setupOutcome(report.checks.basicPictureAndAudio));
+    row(setupText('F1 vaizdas ir garsas','F1 picture and sound'),setupOutcome(report.checks.f1PictureAndAudio));
+    row(setupText('Įprasta F1 licencija','Ordinary F1 license'),report.checks.ordinaryF1License==='observed'?setupText('Priėmimas užfiksuotas bandymo metu','Acceptance observed during test'):setupText('Dar nepatvirtinta','Not verified yet'));
+    card.appendChild(rows);card.appendChild(node('p',setupText('Rezultatas galioja šiam TV, programėlės ir TV programinės įrangos versijoms. Kitų modelių ir būsimos licencijos kaitos jis nepatvirtina.','This result applies to this TV and these app/firmware versions. It does not establish other models or future license renewal.'),'settings-note'));
+    var actions=node('div','','settings-actions');
+    var check=setupButton(actions,'Patikrinti F1 ryšį','Check F1 connection',runSetupChecks,'compatibility-check',true);check.disabled=setupCheckBusy;check.setAttribute('data-default-focus','true');
+    setupButton(actions,'Patikrinti bandomąjį vaizdą','Test clip',function(){startSetupProbe('basic');},'compatibility-basic');
+    var f1=setupButton(actions,'Pasirinkti F1 įrašą patikrai','Choose F1 playback test',chooseF1Probe,'compatibility-f1');f1.disabled=!account||!account.signedIn;
+    setupButton(actions,'Dalintis patikros ataskaita','Share check report',shareSetupReport,'compatibility-share');card.appendChild(actions);main.appendChild(card);
+  }
+  function runSetupChecks(){
+    if(setupCheckBusy)return;setupCheckBusy=true;render();
+    var view=current,runtime=setupRuntime();
+    (runtime.signedIn?request('/api/catalog?page=493').then(function(){return{status:'ready'};},function(e){return{status:'failed',error:Setup.failureCode(e)};}):Promise.resolve({status:'sign-in-required'})).then(function(result){setupCatalogue=result;setupCheckBusy=false;if(current===view&&!playing&&!document.hidden)render();});
+  }
+  function shareSetupReport(){
+    var text=JSON.stringify(setupReport(),null,2);
+    dialog(setupText('Pasidalink patikra','Share the check'),setupText('Ataskaitoje – tik TV modelis, versijos ir patikros būsenos. Nuskenuok QR telefonu ir nukopijuok tekstą.','The report contains TV details, versions, and check results only. Scan the QR with your phone and copy the text.'),[{label:setupText('Grįžti','Back'),default:true}]);
+    var box=modal.querySelector('.modal-box');box.classList.add('report-modal');var area=node('div','','report-content'),canvas=node('canvas','','report-qr');canvas.width=320;canvas.height=320;canvas.setAttribute('aria-label',setupText('Patikros ataskaitos QR kodas','Check report QR code'));
+    var qr=window.qrcode(0,'M');qr.addData(JSON.stringify(JSON.parse(text)));qr.make();var modules=qr.getModuleCount(),scale=Math.floor(320/(modules+8)),size=(modules+8)*scale;canvas.width=canvas.height=size;var painter=canvas.getContext('2d');painter.fillStyle='#fff';painter.fillRect(0,0,size,size);painter.fillStyle='#000';for(var y=0;y<modules;y++)for(var x=0;x<modules;x++)if(qr.isDark(y,x))painter.fillRect((x+4)*scale,(y+4)*scale,scale,scale);area.appendChild(canvas);area.appendChild(node('pre',text,'report-text'));box.insertBefore(area,box.querySelector('.modal-actions'));
+    if(navigator.clipboard&&navigator.clipboard.writeText){var copy=button(setupText('Kopijuoti ataskaitą','Copy report'),function(){navigator.clipboard.writeText(text).then(function(){copy.textContent=setupText('Nukopijuota','Copied');}).catch(function(){copy.textContent=setupText('Nuskenuok QR telefonu','Scan QR with your phone');});},'secondary-button');box.querySelector('.modal-actions').appendChild(copy);}
+  }
+  function renderSetupEntry(main){
+    var section=node('section','','settings-section');section.appendChild(node('h2',setupText('Pasiruošimas ir suderinamumas','Setup and compatibility')));
+    section.appendChild(node('p',setupText('Žingsniai naujam televizoriui ir saugi patikros ataskaita.','Guided setup for a new TV and a shareable check report.')));
+    var actions=node('div','','settings-actions');setupButton(actions,'Pirmo paleidimo vedlys','Getting started',beginSetup,'settings-setup');setupButton(actions,'Suderinamumo patikra','Compatibility check',function(){openSetupPage('compatibility',setupText('Suderinamumo patikra','Compatibility check'));},'settings-compatibility');section.appendChild(actions);main.appendChild(section);
+  }
+  function playerMore(){
+    if(!playing||viewBusy||seekBusy)return;var choices=[{label:setupText('Grįžti','Back'),default:true}];
+    if(activePlayback){choices.push({label:document.getElementById('player-quality').textContent,run:selectQuality});choices.push({label:setupText('Mėgstamo lenktynininko POV','Favorite driver POV'),run:favoriteCamera});}
+    var m=metrics(),canSeek=playbackKind==='live'?Boolean(m&&getLiveWindow(m.position)):Boolean(m&&m.duration);
+    if(canSeek){choices.push({label:setupText('Atgal 60 sekundžių','Rewind 60 seconds'),run:function(){seek(false,60);}});choices.push({label:setupText('Pirmyn 60 sekundžių','Forward 60 seconds'),run:function(){seek(true,60);}});}
+    choices.push({label:setupText('Baigti žiūrėjimą','Stop watching'),run:stopPlayback});dialog(setupText('Daugiau pasirinkimų','More options'),setupText('Kokybė, mėgstama kamera ir kiti veiksmai.','Quality, favorite camera, and other actions.'),choices);
+  }
+
+
   function renderSettings(main) {
-    if (ctx.standalone) renderTVAccount(main);renderLanguageSettings(main);renderExperienceSettings(main);driverPreferences(main);
+    if (ctx.standalone) renderTVAccount(main);renderLanguageSettings(main);renderSetupEntry(main);renderExperienceSettings(main);driverPreferences(main);
     var section = node('section', '', 'settings-section'); section.appendChild(node('h2', 'Programėlė'));
     section.appendChild(node('p', 'Patikrink vaizdą arba atnaujink meniu.'));
     var actions = node('div', '', 'settings-actions');
@@ -2968,6 +5478,8 @@ window.ApexProtectionProbe = {
     if(current.video)renderVideoDetails(main,current.video);
     else if(current.tab==='home')renderHome(main);
     else if(current.tab==='settings')renderSettings(main);
+    else if(current.tab==='setup')renderSetup(main);
+    else if(current.tab==='compatibility')renderCompatibility(main);
     else if(current.tab==='weekend'&&account&&account.signedIn)renderWeekend(main);
     else if(current.tab==='search'&&!current.page&&!current.detail&&account&&account.signedIn)renderGlobalSearch(main);
     else if(current.tab==='saved'||current.tab==='history')renderItems(main,localStore.state()[current.tab==='saved'?'favorites':'progress']);
@@ -2979,6 +5491,7 @@ window.ApexProtectionProbe = {
         request(route).then(function(data){if(current!==view||pending!==pendingRequest||!document.contains(main))return;loading.remove();catalogueCache.put(route,data.items||[]);renderItems(main,data.items||[],Date.now());if(awaitingCatalogFocus===view){setFocus();awaitingCatalogFocus=null;}if(current.tab==='live')liveTimer=setInterval(function(){refreshLive(false);},30000);}).catch(function(e){if(current!==view||pending!==pendingRequest||!document.contains(main))return;loading.remove();awaitingCatalogFocus=null;var fallback=catalogueCache.get(route);if(fallback)renderItems(main,fallback.items,fallback.at,true);error(main,e.message,function(){render();});});
       }
     }
+    if(typeof setupCaptureF1!=='undefined'&&setupCaptureF1){var testNotice=node('section',setupText('Pasirink F1 įrašą patikrai. Baigęs grįžk su Atgal.','Choose F1 playback to test, then return with Back.'),'setup-result');testNotice.appendChild(button(setupText('Atšaukti patikrą','Cancel test'),function(){setupCaptureF1=false;render();},'secondary-button'));main.insertBefore(testNotice,main.firstChild);}
     setFocus();updateConnection();motion.enter(main.querySelector('.hero-copy,.page-heading'));
   }
   function renderTVAccount(main) {
@@ -2986,7 +5499,7 @@ window.ApexProtectionProbe = {
     if (account && account.signedIn) {
       var summary = node('div', '', 'account-summary'), copy = node('div'); copy.appendChild(node('h2', 'F1 TV paskyra'));
       copy.appendChild(node('p', 'Prisijungta · ' + account.country)); summary.appendChild(copy);
-      summary.appendChild(focusKey(button('Atsijungti', function () { dialog('Atsijungti nuo F1 TV?','Šiame TV bus pašalinta F1 sesija, žiūrėjimo istorija ir mėgstami įrašai.',[{label:'Atšaukti',default:true},{label:'Atsijungti',run:function(){window.ApexStandalone.signOut().then(function(){localStore.clearAccount();catalogueCache.clear();driverStore.clear();weekendData=null;preferredAudioLanguage="";try{localStorage.removeItem("apex-audio-language");}catch(_){}stack=[];refreshAccount();}).catch(function(e){error(root.querySelector('main'),e.message);});}}]); }, 'secondary-button'), 'account-signout')); box.appendChild(summary);
+      summary.appendChild(focusKey(button('Atsijungti', function () { dialog('Atsijungti nuo F1 TV?','Šiame TV bus pašalinta F1 sesija, žiūrėjimo istorija ir mėgstami įrašai.',[{label:'Atšaukti',default:true},{label:'Atsijungti',run:function(){window.ApexStandalone.signOut().then(function(){localStore.clearAccount();setupStore.clearAccount();setupCatalogue={status:"untested"};catalogueCache.clear();driverStore.clear();weekendData=null;preferredAudioLanguage="";try{localStorage.removeItem("apex-audio-language");}catch(_){}stack=[];refreshAccount();}).catch(function(e){error(root.querySelector('main'),e.message);});}}]); }, 'secondary-button'), 'account-signout')); box.appendChild(summary);
     } else {
       box.appendChild(node('h2', 'Prisijunk prie F1 TV')); box.appendChild(node('p', 'Duomenys siunčiami tiesiai F1. Slaptažodis neišsaugomas.'));
       var form = node('form'), email = node('input'), password = node('input'), message = node('p');
@@ -3007,8 +5520,10 @@ window.ApexProtectionProbe = {
   function productInfo() {
     var info = {}, issues = [], product = window.webapis && webapis.productinfo;
     try {
-      if (product && product.getModel) info.model = String(product.getModel());
+      var modelName='';try{if(window.tizen&&tizen.systeminfo&&tizen.systeminfo.getCapability)modelName=tizen.systeminfo.getCapability('http://tizen.org/system/model_name');}catch(_){}
+      if(typeof modelName==='string'&&modelName)info.model=modelName;
       else if (product && product.getModelCode) info.model = String(product.getModelCode());
+      else if (product && product.getModel) info.model = String(product.getModel());
       else issues.push('model API unavailable');
     } catch (e) { issues.push('model ' + e.name); }
     try {
@@ -3023,7 +5538,7 @@ window.ApexProtectionProbe = {
   function asBytes(base64) { var str = atob(base64), b = new Uint8Array(str.length); for (var i = 0; i < str.length; i++) b[i] = str.charCodeAt(i); return b; }
   function base64(buffer) { var a = new Uint8Array(buffer), str = ''; for (var i = 0; i < a.length; i++) str += String.fromCharCode(a[i]); return btoa(str); }
   function stopPlayback(ended,keepSession) {
-    cancelRecovery();if(!keepSession)playbackHealth.reset();
+    if(typeof cancelScrub==='function')cancelScrub();cancelRecovery();if(!keepSession)playbackHealth.reset();
     if(seekBusy){pendingStop=true;return;}lastMetrics=metrics()||lastMetrics;savePlayback(ended===true);activePlayback=null;lastMetrics=null;clearInterval(liveTimer);pendingStop=false;
     if(modal)closeModal();viewBusy=false;epoch++; playing = false; tracks = []; clearTimeout(hideTimer); clearTimeout(prepareTimer);
     activeEngine = '';
@@ -3035,12 +5550,15 @@ window.ApexProtectionProbe = {
     document.body.classList.remove('playing'); document.body.classList.remove('html-playing');
     document.documentElement.classList.remove('html-playing');
     document.documentElement.classList.remove('native-playing');
+    var completedProbe=!keepSession&&setupProbe; if(completedProbe)setupProbe=null;
     overlay.hidden = true; root.hidden = false; render();
+    if(completedProbe&&!document.hidden)finishSetupProbe(completedProbe);
   }
   function playbackError(message, generation) {
     if (generation !== epoch) return;
     diagnostic('playback_error', { error: message });
     if(tryRecovery(message,activePlayback))return;
+    if(setupProbe){setupStore.test(setupProbe.kind,'failed',setupProbe.runtime,setupProbe);setupProbe=null;}
     var failed=activePlayback;stopPlayback(); error(root.querySelector('main'),message,failed?function(){startContent(failed.item,failed.compatibilityStart,UX.resume(localStore.get(failed.item.id))||failed.resumeAt,{channelId:failed.channelId,channelTitle:failed.channelTitle,audioTrackId:failed.audioTrackId,videoQuality:failed.videoQuality});}:render);
     if(failed&&failed.videoQuality==='best'){var panel=root.querySelector('.error-actions');if(panel)panel.appendChild(button('Bandyti su 720p',function(){saveQuality('720p');startContent(failed.item,failed.compatibilityStart,UX.resume(localStore.get(failed.item.id))||failed.resumeAt,{channelId:failed.channelId,channelTitle:failed.channelTitle,audioTrackId:failed.audioTrackId,videoQuality:'720p'});},'secondary-button'));}
   }
@@ -3480,7 +5998,7 @@ window.ApexProtectionProbe = {
     if(!main)return;var existing=main.querySelector('.error-panel');if(existing)existing.remove();var panel=node('div','','error-panel');panel.setAttribute('role','alert');var copy=node('div');copy.appendChild(node('p',UX.explain(message),'error'));panel.appendChild(copy);
     var actions=node('div','','error-actions'),retry=focusKey(button('Bandyti dar kartą',function(){panel.remove();(retryAction||render)();},'secondary-button'),'retry');actions.appendChild(retry);actions.appendChild(focusKey(button('Nustatymai',function(){showTab('settings','Nustatymai');},'secondary-button'),'error-settings'));panel.appendChild(actions);main.appendChild(panel);retry.focus();panel.scrollIntoView({block:'nearest'});
   }
-  function refreshAccount() {request('/api/status').then(function(data){account=data.account;render();}).catch(function(e){error(layout(),e.message,refreshAccount);});}
+  function refreshAccount() {request('/api/status').then(function(data){account=data.account;var state=setupStore.state();if(current.tab==='home'&&!playing&&!state.deferred&&state.phase!=='done'&&(state.phase!=='welcome'||!account||!account.signedIn))current={tab:'setup',title:setupText('Pirmas paleidimas','Getting started')};render();}).catch(function(e){error(layout(),e.message,refreshAccount);});}
   function goBack() {
     cancelRecovery();if(modal){closeModal();return;}if(playing){if(!overlay.hidden){hideOverlay();return;}stopPlayback();return;}if(stack.length){current=stack.pop();render();return;}if(current.tab!=='home'){showTab('home','Pradžia');return;}
     var sidebar=root.querySelector('.tv-sidebar');if(sidebar&&!sidebar.contains(document.activeElement)){var chosen=sidebar.querySelector('.selected');current.sidebarReturn=document.activeElement&&document.activeElement.getAttribute('data-focus-key');if(chosen)chosen.focus();return;}
@@ -3557,29 +6075,38 @@ window.ApexProtectionProbe = {
     source.then(function(stream){
       if(generation!==epoch||activePlayback!==previous)return;viewBusy=false;if(document.hidden)return;
       var m=metrics()||lastMetrics||{position:previous.resumeAt,paused:false},next=prepareViewPlayback(previous.item,stream,previous.compatibilityStart,previous.item.live?0:m.position,{channelId:channelId,channelTitle:channelTitle,audioTrackId:options.audioTrackId||(options.videoQuality?previous.audioTrackId:undefined),videoQuality:qualityMode});
-      next.restoreAfterSwitch=true;next.pausedAtStart=m.paused;next.returnFocus=options.automatic?'':options.videoQuality?'player-quality':(options.audioTrackId||options.commentary)?'player-audio':'player-camera';var liveBefore=previous.item.live&&getLiveWindow(m.position);next.liveResumeDelay=liveBefore?liveBefore.delay:previous.liveResumeDelay||0;next.bestBandwidth=previous.bestBandwidth;next.bestHeight=previous.bestHeight;stream.compatibilityStart=Boolean(previous.compatibilityStart)&&!stream.relayed&&!stream.nativeTest;
+      next.restoreAfterSwitch=true;next.pausedAtStart=m.paused;next.returnFocus=options.automatic?'':options.videoQuality?'player-more':(options.audioTrackId||options.commentary)?'player-audio':'player-camera';var liveBefore=previous.item.live&&getLiveWindow(m.position);next.liveResumeDelay=liveBefore?liveBefore.delay:previous.liveResumeDelay||0;next.bestBandwidth=previous.bestBandwidth;next.bestHeight=previous.bestHeight;stream.compatibilityStart=Boolean(previous.compatibilityStart)&&!stream.relayed&&!stream.nativeTest;
       if(current.video&&current.video.id===next.item.id){current.channelId=next.channelId;current.channelTitle=next.channelTitle;}stopPlayback(false,true);activePlayback=next;lastMetrics=null;lastSaved=Date.now();
       if(options.audioTrackId&&next.audioLanguage){preferredAudioLanguage=next.audioLanguage;try{localStorage.setItem('apex-audio-language',preferredAudioLanguage);}catch(_){}}
       if(options.videoQuality&&!options.automatic)saveQuality(qualityMode);
       if(options.videoQuality)playbackHealth.switched(qualityMode,options.automatic===true);
       diagnostic(options.videoQuality?'quality_changed':options.audioTrackId?'audio_changed':options.commentary?'commentary_changed':'camera_changed',{engine:options.videoQuality?qualityMode:options.audioTrackId?next.audioLanguage:'channel='+next.channelId});
       begin(stream,viewTitle(next),next.item.live?'live':'vod');updateViewControls();
-      var target=document.getElementById(options.videoQuality?'player-quality':(options.audioTrackId||options.commentary)?'player-audio':'player-camera');if(target&&!options.automatic)target.focus();
+      var target=document.getElementById(options.videoQuality?'player-more':(options.audioTrackId||options.commentary)?'player-audio':'player-camera');if(target&&!options.automatic)target.focus();
     }).catch(function(e){if(generation!==epoch||activePlayback!==previous)return;viewBusy=false;updateViewControls();if(options.automatic){playbackHealth.failed(previous.videoQuality,options.videoQuality);diagnostic('automatic_quality_failed',{error:e.message});I18n.setText(document.getElementById('player-state'), 'Tęsiama esama kokybe.');return;}dialog('Pasirinkimo pritaikyti nepavyko',String(e.message||'Bandyk dar kartą.'),[{label:'Tęsti žiūrėjimą',default:true}]);});
   }
   function resetPlayerTimeline(kind) {
     var elapsed=document.getElementById('player-elapsed'),bar=document.getElementById('player-timeline');if(!elapsed||!bar)return;
-    var live=kind==='live',position=activePlayback&&!live?activePlayback.resumeAt||0:0;I18n.setText(elapsed, live?'● TIESIOGIAI':UX.time(position));I18n.setText(document.getElementById('player-remaining'), '');bar.hidden=true;bar.setAttribute('aria-valuenow',String(Math.round(position)));bar.firstChild.style.transform='scaleX(0)';I18n.setText(document.getElementById('play-pause'), 'Pauzė');
+    if(typeof cancelScrub==='function')cancelScrub();var live=kind==='live',position=activePlayback&&!live?activePlayback.resumeAt||0:0;UI.text(elapsed,live?'● TIESIOGIAI':UX.time(position));UI.text(document.getElementById('player-remaining'),'');bar.hidden=true;bar.setAttribute('aria-valuenow',String(Math.round(position)));bar.firstChild.style.transform='scaleX(0)';UI.text(document.getElementById('play-pause'),'Pauzė');
     Array.prototype.forEach.call(overlay.querySelectorAll('.seek-button'),function(b){b.disabled=true;});
   }
   function installPlayerControls() {
     if(document.getElementById('player-timeline'))return;
-    var hint=overlay.querySelector('p:last-child');if(hint)I18n.setText(hint,'OK / ⏯ – pauzė · ↑ – valdikliai · Atgal – paslėpti / meniu');
+    var hint=overlay.querySelector('p:last-child');if(hint)hint.textContent=setupText('↑ – laiko juosta · ← / → – pasirinkti · OK – persukti · Atgal – paslėpti','↑ – timeline · ← / → – select · OK – seek · Back – hide');
     var row=node('div','','player-time-row'),elapsed=node('span','0:00');elapsed.id='player-elapsed';row.appendChild(elapsed);
-    var bar=node('div','','player-timeline');bar.id='player-timeline';bar.setAttribute('role','progressbar');I18n.attr(bar, 'aria-label', 'Žiūrėjimo progresas');bar.setAttribute('aria-valuemin','0');bar.appendChild(node('span'));row.appendChild(bar);var remaining=node('span','');remaining.id='player-remaining';row.appendChild(remaining);overlay.insertBefore(row,overlay.querySelector('.player-buttons'));
-    var buttons=overlay.querySelector('.player-buttons');[['−60 sek.',-60],['−10 sek.',-10],['+10 sek.',10],['+60 sek.',60]].forEach(function(entry){var b=button(entry[0],function(){seek(entry[1]>0,Math.abs(entry[1]));},'seek-button');I18n.attr(b, 'aria-label', (entry[1]>0?'Pirmyn ':'Atgal ')+Math.abs(entry[1])+' sekundžių');buttons.insertBefore(b,document.getElementById('back-menu'));});
-    var camera=button('Kamera',selectCamera,'view-button');camera.id='player-camera';buttons.insertBefore(camera,document.getElementById('back-menu'));
-    var audio=button('Kalba / garsas',selectAudio,'view-button');audio.id='player-audio';buttons.insertBefore(audio,document.getElementById('back-menu'));var quality=button('Kokybė: geriausia',selectQuality,'view-button');quality.id='player-quality';buttons.insertBefore(quality,document.getElementById('back-menu'));var favorite=button('★ Lenktynininkas',favoriteCamera,'view-button');favorite.id='player-favorite-driver';buttons.insertBefore(favorite,document.getElementById('back-menu'));var live=button('● Grįžti į eterį',liveEdge,'view-button');live.id='player-live-edge';live.hidden=true;buttons.insertBefore(live,document.getElementById('back-menu'));updateViewControls();
+    var bar=node('div','','player-timeline');bar.id='player-timeline';bar.tabIndex=-1;bar.setAttribute('role','slider');bar.setAttribute('aria-label',setupText('Pasirinkti atkūrimo laiką','Choose playback time'));bar.setAttribute('aria-orientation','horizontal');bar.setAttribute('aria-valuemin','0');bar.appendChild(node('span','','scrub-fill'));bar.appendChild(node('span','','scrub-marker'));
+    bar.addEventListener('focus',function(){if(!scrubber.active())startScrub();scheduleScrubPaint();});bar.addEventListener('blur',function(){cancelScrub();if(playing&&!overlay.hidden&&!seekBusy)updatePlayer();});
+    bar.addEventListener('click',function(e){if(!startScrub())return;var rect=bar.getBoundingClientRect();if(rect.width>0){scrubber.fraction((e.clientX-rect.left)/rect.width);scheduleScrubPaint();}});
+    row.appendChild(bar);var remaining=node('span','');remaining.id='player-remaining';row.appendChild(remaining);overlay.insertBefore(row,overlay.querySelector('.player-buttons'));
+    var buttons=overlay.querySelector('.player-buttons'),back=document.getElementById('back-menu');back.hidden=true;
+    function add(label,id,run,hidden){var b=button(label,run,'view-button');b.id=id;b.hidden=Boolean(hidden);buttons.insertBefore(b,back);return b;}
+    add('Kameros / POV','player-camera',selectCamera);
+    add('Garsas','player-audio',selectAudio);
+    add('Kokybė: geriausia','player-quality',selectQuality,true);
+    add('★ Lenktynininkas','player-favorite-driver',favoriteCamera,true);
+    add('● Grįžti į eterį','player-live-edge',liveEdge,true);
+    add(setupText('Daugiau','More'),'player-more',playerMore);
+    updateViewControls();
   }
   function metrics() {
     if(seekBusy||!playing)return null;
@@ -3597,6 +6124,7 @@ window.ApexProtectionProbe = {
   }
   function updatePlayer() {
     if(!playing||document.hidden)return;if(seekBusy){if(!overlay.hidden)updateViewControls(null);return;}var m=metrics();if(!m){if(!overlay.hidden)updateViewControls(null);return;}lastMetrics=m;
+    if(typeof setupProbe!=="undefined"&&setupProbe){if(setupProbe.position===null)setupProbe.position=m.position;else if(m.position>setupProbe.position+1)setupProbe.progressObserved=true;}
     if(activePlayback&&!activePlayback.resumeApplied&&playbackKind==='vod'){
       activePlayback.resumeApplied=true;var target=activePlayback.resumeAt;
       if((target>=20||activePlayback.restoreAfterSwitch&&target>0)&&m.duration>target+(activePlayback.restoreAfterSwitch?1:20)){
@@ -3609,11 +6137,16 @@ window.ApexProtectionProbe = {
     if(restorePause(m))m.paused=true;lastMetrics=m;
     if(m.paused&&overlay.hidden&&!overlayDismissed)showOverlay();
     if(!overlay.hidden){
-      updateViewControls(m);var pause=document.getElementById('play-pause');UI.text(pause,m.paused?'Tęsti':'Pauzė');UI.attr(pause,'aria-label',m.paused?'Tęsti vaizdą':'Sustabdyti vaizdą');
-      var behind=liveRange&&liveRange.delay>6;UI.text(document.getElementById('player-elapsed'),live?(behind?'−'+UX.time(liveRange.delay):'● TIESIOGIAI'):UX.time(m.position));UI.text(document.getElementById('player-remaining'),live?(liveRange?'Nuo eterio':'Tiesioginis vaizdas'):m.duration?'Liko '+UX.time(Math.max(0,m.duration-m.position)):'');
-      var timeline=document.getElementById('player-timeline'),length=live&&liveRange?liveRange.duration:m.duration,progress=live&&liveRange?m.position-liveRange.start:m.position;UI.set(timeline,'hidden',live?!liveRange:!m.duration);UI.attr(timeline,'aria-valuemax',String(Math.round(length)));UI.attr(timeline,'aria-valuenow',String(Math.round(progress)));UI.style(timeline.firstChild,'transform','scaleX('+(length?Math.max(0,Math.min(1,progress/length)):0).toFixed(6)+')');
+      updateViewControls(m);var pause=document.getElementById('play-pause');UI.text(pause,m.paused?'Tęsti':'Pauzė');UI.attr(pause,'aria-label',I18n.text(m.paused?'Tęsti vaizdą':'Sustabdyti vaizdą'));
+      var timeline=document.getElementById('player-timeline'),length=live&&liveRange?liveRange.duration:m.duration,progress=live&&liveRange?m.position-liveRange.start:m.position,canScrub=live?Boolean(liveRange):m.duration>1;
+      UI.set(timeline,'hidden',!canScrub);UI.set(timeline,'tabIndex',canScrub&&!viewBusy?0:-1);UI.attr(timeline,'aria-disabled',String(!canScrub||viewBusy));
+      if(typeof scrubber!=='undefined'&&scrubber.active()){scrubber.sync(m.position);paintScrub();}
+      else{
+        var behind=liveRange&&liveRange.delay>6;UI.text(document.getElementById('player-elapsed'),live?(behind?'−'+UX.time(liveRange.delay):'● TIESIOGIAI'):UX.time(m.position));UI.text(document.getElementById('player-remaining'),live?(liveRange?'Nuo eterio':'Tiesioginis vaizdas'):m.duration?'Liko '+UX.time(Math.max(0,m.duration-m.position)):'');
+        UI.attr(timeline,'aria-valuemin',String(Math.floor(liveRange?liveRange.start:0)));UI.attr(timeline,'aria-valuemax',String(Math.floor(liveRange?liveRange.edge:Math.max(0,m.duration-1))));UI.attr(timeline,'aria-valuenow',String(Math.round(m.position)));UI.style(timeline.firstChild,'transform','scaleX('+(length?Math.max(0,Math.min(1,progress/length)):0).toFixed(6)+')');
+      }
       Array.prototype.forEach.call(overlay.querySelectorAll('.seek-button'),function(b){UI.set(b,'disabled',live?!liveRange:!m.duration);});
-      var edge=document.getElementById('player-live-edge');if(edge){UI.set(edge,'hidden',!live);UI.set(edge,'disabled',viewBusy||seekBusy);}
+      var edge=document.getElementById('player-live-edge');if(edge){UI.set(edge,'hidden',!live||!liveRange||liveRange.delay<=6);UI.set(edge,'disabled',viewBusy||seekBusy);}
       if(!viewBusy){var stateLabel=document.getElementById('player-state');if(m.paused)UI.text(stateLabel,'Pristabdyta');else if(stateLabel.textContent===I18n.text('Pristabdyta'))UI.text(stateLabel,'');}
     }
     if(m.paused&&!overlayDismissed)showOverlay();if(Date.now()-lastSaved>10000)savePlayback();if(typeof checkPlaybackHealth==='function')checkPlaybackHealth(m);
@@ -3623,7 +6156,7 @@ window.ApexProtectionProbe = {
     var entering=overlay.hidden;overlayDismissed=false;overlay.hidden=false;if(entering){motion.enter(overlay);if(playing)updatePlayer();}clearTimeout(hideTimer);hideTimer=setTimeout(function(){if(playing&&!modal&&!viewBusy&&!seekBusy&&!(lastMetrics&&lastMetrics.paused)&&!overlay.contains(document.activeElement))overlay.hidden=true;},7000);
   }
   function hideOverlay() {
-    clearTimeout(hideTimer);overlayDismissed=true;overlay.hidden=true;
+    if(typeof cancelScrub==='function')cancelScrub();clearTimeout(hideTimer);overlayDismissed=true;overlay.hidden=true;
     var focused=document.activeElement;if(focused&&overlay.contains(focused)&&focused.blur)focused.blur();
   }
   function toggle() {
@@ -3657,7 +6190,7 @@ window.ApexProtectionProbe = {
       if(pending!==pendingRequest||!document.contains(main)||document.hidden)return null;viewOptions=resolved;
       return request('/api/play','POST',{id:item.id,channelId:viewOptions.channelId||'',audioTrackId:viewOptions.audioTrackId||'',audioLanguage:viewOptions.audioLanguage||preferredAudioLanguage,videoQuality:Quality.mode(viewOptions.videoQuality||preferredQuality),platform:compatibilityStart?'WEB_HLS':undefined,relay:Boolean(compatibilityStart)});
     }).then(function(stream){
-      if(!stream||pending!==pendingRequest||!document.contains(main))return;status.remove();if(document.hidden)return;if(resumeAt===0&&!item.live&&localStore.get(item.id))localStore.record(item,0,item.duration);stream.compatibilityStart=Boolean(compatibilityStart)&&!stream.relayed&&!stream.nativeTest;activePlayback=prepareViewPlayback(item,stream,compatibilityStart,resumeAt===undefined?UX.resume(localStore.get(item.id)):resumeAt,viewOptions);lastMetrics=null;lastSaved=Date.now();begin(stream,viewTitle(activePlayback),item.live?'live':'vod');updateViewControls();
+      if(!stream||pending!==pendingRequest||!document.contains(main))return;status.remove();if(document.hidden)return;if(resumeAt===0&&!item.live&&localStore.get(item.id))localStore.record(item,0,item.duration);stream.compatibilityStart=Boolean(compatibilityStart)&&!stream.relayed&&!stream.nativeTest;activePlayback=prepareViewPlayback(item,stream,compatibilityStart,resumeAt===undefined?UX.resume(localStore.get(item.id)):resumeAt,viewOptions);lastMetrics=null;lastSaved=Date.now();if(typeof setupCaptureF1!=='undefined'&&setupCaptureF1){setupCaptureF1=false;setupProbe={kind:'f1',runtime:setupRuntime(),position:null,progressObserved:false,ordinaryLicenseObserved:false};}begin(stream,viewTitle(activePlayback),item.live?'live':'vod');updateViewControls();
     }).catch(function(e){if(pending!==pendingRequest||!document.contains(main))return;status.remove();var failed={item:item,compatibilityStart:compatibilityStart,resumeAt:resumeAt||0,channelId:viewOptions.channelId||'',channelTitle:viewOptions.channelTitle||'',audioTrackId:viewOptions.audioTrackId||'',videoQuality:viewOptions.videoQuality||preferredQuality};if(tryRecovery(e.message,failed))return;error(main,e.message,function(){startContent(item,compatibilityStart,resumeAt,viewOptions);});});
   }
   function firstMenuContent() {
@@ -3709,9 +6242,10 @@ window.ApexProtectionProbe = {
         if (event.target && /^(INPUT|TEXTAREA)$/.test(event.target.tagName)) { if (key === 10009 || key === 27) { event.preventDefault(); event.target.blur(); } return; }
         if (key === 10009 || key === 27) { event.preventDefault(); goBack(); return; }
         if (playing) {
+          if(timelineKey(key)){event.preventDefault();return;}
           if (key === 13) { event.preventDefault(); if (!overlay.hidden && overlay.contains(document.activeElement)) document.activeElement.click(); else toggle(); }
           else if (key === 10252) { event.preventDefault(); toggle(); }
-          else if (key === 38 || key === 40) { event.preventDefault(); showOverlay(); document.getElementById(key === 38 ? 'play-pause' : 'back-menu').focus(); }
+          else if (key === 38 || key === 40) { event.preventDefault(); showOverlay();if(key===38&&focusScrub())return;document.getElementById(key===38?'play-pause':'player-more').focus(); }
           else if (key === 415 || key === 19) { event.preventDefault(); if(seekBusy)return;try { if (activeEngine === 'AVPlay') { var playerState = nativePlayer.getState(); if (key === 415 && playerState === 'PAUSED') nativePlayer.play(); if (key === 19 && playerState === 'PLAYING') { nativePlayer.pause();clearTimeout(prepareTimer); } } else if (key === 415) video.play(); else video.pause(); } catch (e) {} showOverlay(); }
           else if (key === 37 || key === 39) { event.preventDefault(); if(!overlay.hidden&&overlay.contains(document.activeElement)){var controls=Array.prototype.slice.call(overlay.querySelectorAll('button')).filter(function(b){return !b.disabled&&!b.hidden;}),index=controls.indexOf(document.activeElement),next=index+(key===37?-1:1);if(next>=0&&next<controls.length)controls[next].focus();}else seek(key===39); }
           else if (key === 412 || key === 417) { event.preventDefault(); seek(key===417); }
@@ -3723,7 +6257,7 @@ window.ApexProtectionProbe = {
       });
       var info = productInfo(); info.engine = nativePlayer ? 'AVPlay' : 'browser preview';
       diagnostic('app_started', info); refreshAccount();
-      
+
       try {
         if (window.tizen && tizen.application) {
           var ownApp = tizen.application.getCurrentApplication().appInfo;

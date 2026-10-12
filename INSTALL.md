@@ -53,7 +53,10 @@ must use the same author certificate as the original installation.
 ## 4. Sign in and start watching
 
 Open **Apex TV** and sign in with your own F1 TV account **on the television**.
-Apps2Samsung does not need your F1 TV password.
+Apps2Samsung does not need your F1 TV password. The first-run guide takes
+you through sign-in, a picture and sound check, and Add to Home. You confirm
+the test result yourself; a moving player clock alone does not pass it.
+Open **Settings → Getting started** to repeat or resume the guide.
 
 The public package starts in English. To change the menu language, open
 **Settings → App language → Lietuvių**. The TV saves the choice; commentary
@@ -76,6 +79,15 @@ not need a computer.
 Changes to the native shell or its permissions require installing a new WGT
 with the original author certificate. Removing and reinstalling the app may
 clear its saved login and preferences.
+
+## Compatibility report
+
+Open **Settings → Compatibility check**, run the checks, and choose **Share check report**.
+The QR code contains a compact JSON report generated locally. Scan it to copy
+the report into a bug or compatibility issue; nothing is uploaded automatically.
+The report contains selected model/version and check results, never raw account
+state, passwords, tokens, TV network identifiers or DRM challenges/licenses.
+A passed clear test video does not establish F1 DRM or future live compatibility.
 
 ## Troubleshooting
 

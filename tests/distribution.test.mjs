@@ -13,10 +13,13 @@ test('public WGT builds the full playable UI without personal configuration or d
   try{
     const result=await buildTV({outputDirectory:directory}), archive=await fs.readFile(path.join(directory,result.filename)), files=unpackZip(archive);
     const bundled={window:{}};vm.runInNewContext(await fs.readFile(new URL('../tv/bundled-version.js',import.meta.url),'utf8'),bundled);
-    assert.equal(result.unsigned,true);assert.equal(result.entries,14);assert.equal(result.revision,bundled.window.APEX_BUNDLED.revision);
-    for(const name of ['config.xml','index.html','icon.png','menu/tv-app.js','menu/tv.css','LICENSE','menu/dash-LICENSE.md','menu/dash.all.min.js.LICENSE.txt'])assert.ok(files.has(name),name);
+    assert.equal(result.unsigned,true);assert.equal(result.entries,15);assert.equal(result.revision,bundled.window.APEX_BUNDLED.revision);
+    for(const name of ['config.xml','index.html','icon.png','menu/tv-app.js','menu/tv.css','LICENSE','menu/dash-LICENSE.md','menu/dash.all.min.js.LICENSE.txt','menu/qrcode-LICENSE'])assert.ok(files.has(name),name);
     assert.ok(files.get('menu/tv-app.js').includes(Buffer.from('ApexNativeRelay')));
     assert.ok(files.get('menu/tv-app.js').includes(Buffer.from('ApexTV')));
+    assert.ok(files.get('menu/tv-app.js').includes(Buffer.from('ApexTimeline')));
+    assert.ok(files.get('menu/tv-app.js').includes(Buffer.from('ApexSetupChecks')));
+    assert.match(files.get('menu/qrcode-LICENSE').toString(),/Copyright \(c\) 2009 Kazuhiko Arase/);
     assert.equal(files.has('author-signature.xml'),false);assert.equal(files.has('signature1.xml'),false);
     const config={window:{}};vm.runInNewContext(files.get('connection.js').toString(),config);
     assert.equal(config.window.APEX_CONFIG.server,'');assert.equal(config.window.APEX_CONFIG.pairingKey,'');assert.equal(config.window.APEX_CONFIG.publicKey.d,undefined);

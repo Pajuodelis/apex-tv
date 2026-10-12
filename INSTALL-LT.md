@@ -39,7 +39,10 @@ TV sertifikatu. Sertifikato ir paskyrų slaptažodžių niekam siųsti nereikia.
 ## 4. Prisijunk televizoriuje
 
 Paleisk **Apex TV**, pasirink prisijungimą ir televizoriuje įvesk savo F1 TV
-paskyros duomenis. Apps2Samsung nereikia duoti F1 slaptažodžio.
+paskyros duomenis. Apps2Samsung nereikia duoti F1 slaptažodžio. Pirmo paleidimo
+vedlys nuosekliai parodo prisijungimą, vaizdo ir garso patikrą bei pridėjimą
+prie Home. Patikros rezultatą patvirtini pats. Vedlį pakartosi per
+**Nustatymai → Pirmo paleidimo vedlys**.
 Viešas paketas pradeda anglų kalba. Lietuvių kalbą pasirink programėlėje:
 **Settings → App language → Lietuvių**. Pasirinkimas išsaugomas televizoriuje.
 Meniu kalba ir lenktynių komentavimo kalba pasirenkamos atskirai.
@@ -53,6 +56,14 @@ licenciją gauna pats TV. Tavo prenumerata turi suteikti teisę pasirinktam
 TV: **Home → Apps → nustatymai → Apex TV → Add to Home / Pridėti prie pradžios
 ekrano**. Jei ikonos iškart nėra, paleisk programėlę iš diegimo programos,
 grįžk į Apps ir dar kartą patikrink įdiegtų programėlių juostą.
+
+## Suderinamumo patikra
+
+**Nustatymai → Suderinamumo patikra → Patikrinti F1 ryšį** parodo TV modelį, versijas
+ir patikros būseną. **Dalintis patikros ataskaita** vietoje sukuria QR kodą su atrinktu
+JSON raportu. Jį gali nukopijuoti į GitHub problemos aprašą. Automatinio
+siuntimo nėra; paskyrų paslaptys, tinklo identifikatoriai ir DRM duomenys
+neįtraukiami. Bandomojo vaizdo sėkmė dar nepatvirtina F1 DRM ar būsimo eterio.
 
 ## Atnaujinimai
 

@@ -1,5 +1,5 @@
 /* Service-supplied catalogue metadata, global F1 search and weekend schedule. */
-(function(root,factory){var api=factory();if(typeof module==='object'&&module.exports)module.exports=api;else root.ApexDiscovery=api;}(typeof window!=='undefined'?window:globalThis,function(){
+(function(root,factory){var api=factory(root);if(typeof module==='object'&&module.exports)module.exports=api;else root.ApexDiscovery=api;}(typeof window!=='undefined'?window:globalThis,function(root){
   'use strict';var ORIGIN='https://f1tv.formula1.com';
   function clean(v,n){return String(v||'').replace(/[\x00-\x1f\x7f]/g,'').trim().slice(0,n||240);}
   function date(v){if(v===0||v===null||v===undefined||v==='')return 0;var n=typeof v==='number'?v: /^\d{10,13}$/.test(String(v))?Number(v):Date.parse(v);if(n>1000000000&&n<100000000000)n*=1000;return Number.isFinite(n)&&n>=Date.UTC(1950,0,1)&&n<=Date.UTC(2101,0,1)?n:0;}
@@ -30,6 +30,6 @@
     }()).finally(function(){pending=null;});return pending;}
     return{search:function(q){return search(client,q);},weekend:async function(){var values=await Promise.all([loadProgram(),client.live()]),calendar=values[0],live=values[1],now=clock();return{meeting:calendar.meeting,sessions:program(calendar.items,now,live,calendar.meeting),live:live,at:now,timeZone:'Europe/Vilnius'};},clear:function(){cached=null;}};
   }
-  function localTime(raw,day){var value=date(raw);if(!value)return 'Laikas nepateiktas';try{return new Intl.DateTimeFormat(global.ApexI18n?global.ApexI18n.locale():'lt-LT',{timeZone:global.ApexI18n?global.ApexI18n.timeZone():'Europe/Vilnius',weekday:day?'short':undefined,month:day?'short':undefined,day:day?'numeric':undefined,hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date(value));}catch(_){return new Date(value).toLocaleString(global.ApexI18n?global.ApexI18n.locale():'lt-LT');}}
+  function localTime(raw,day){var value=date(raw);if(!value)return 'Laikas nepateiktas';try{return new Intl.DateTimeFormat(root.ApexI18n?root.ApexI18n.locale():'lt-LT',{timeZone:root.ApexI18n?root.ApexI18n.timeZone():'Europe/Vilnius',weekday:day?'short':undefined,month:day?'short':undefined,day:day?'numeric':undefined,hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date(value));}catch(_){return new Date(value).toLocaleString(root.ApexI18n?root.ApexI18n.locale():'lt-LT');}}
   return{normalize:normalize,picture:picture,date:date,query:query,search:search,chooseMeeting:chooseMeeting,program:program,create:create,localTime:localTime};
 }));
