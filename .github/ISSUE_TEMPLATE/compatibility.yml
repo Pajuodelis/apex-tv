@@ -1,0 +1,61 @@
+name: TV compatibility report
+description: Share installation and playback results from your Samsung TV.
+title: "[Compatibility]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Successful and unsuccessful tests are useful. Report only what you observed. Never share account details, TV serial numbers, tokens, certificates or race footage.
+  - type: input
+    id: tv-model
+    attributes:
+      label: Samsung TV model
+      placeholder: UE55AU7092 (model only)
+    validations:
+      required: true
+  - type: input
+    id: tizen-version
+    attributes:
+      label: Tizen version
+      placeholder: 6.0, or unknown
+    validations:
+      required: true
+  - type: input
+    id: app-version
+    attributes:
+      label: Apex TV version
+      description: Include the menu/player version if available.
+    validations:
+      required: true
+  - type: input
+    id: installer
+    attributes:
+      label: Installation method
+      description: Installer name, version and phone/computer OS; say if you used an existing installation.
+    validations:
+      required: true
+  - type: dropdown
+    id: playback
+    attributes:
+      label: Playback result
+      options:
+        - Picture and sound work
+        - Picture works, sound does not
+        - Sound works, picture does not
+        - Playback fails
+        - Installation failed before playback
+        - Not tested
+    validations:
+      required: true
+  - type: textarea
+    id: observation
+    attributes:
+      label: Content and observation
+      description: Identify the session, replay or genuinely live broadcast, viewing duration and whether a computer/companion was running. For installation failures, describe where it stopped.
+    validations:
+      required: true
+  - type: textarea
+    id: notes
+    attributes:
+      label: Additional notes
+      description: Remote navigation, commentary choices or sanitized errors. Redact personal data.

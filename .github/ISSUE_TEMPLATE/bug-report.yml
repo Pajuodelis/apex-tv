@@ -1,0 +1,62 @@
+name: Bug report
+description: Report an installation, interface or playback problem.
+title: "[Bug]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Search existing issues first. Do not share passwords, tokens, DRM data, TV serial numbers, private certificates or race footage. Redact screenshots and logs.
+  - type: input
+    id: tv-model
+    attributes:
+      label: Samsung TV model
+      placeholder: UE55AU7092 (model only)
+    validations:
+      required: true
+  - type: input
+    id: tizen-version
+    attributes:
+      label: Tizen version
+      placeholder: 6.0, or unknown
+    validations:
+      required: true
+  - type: input
+    id: app-version
+    attributes:
+      label: Apex TV version
+      description: Include the menu/player version if available.
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Where does the problem occur?
+      options:
+        - Installation
+        - Sign-in
+        - Menus or remote navigation
+        - Replay playback
+        - Live playback
+        - Updates
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: For installation issues, include installer version and device OS. For playback, identify the session and whether it was live or a replay.
+    validations:
+      required: true
+  - type: textarea
+    id: behavior
+    attributes:
+      label: Expected and actual behavior
+      description: Describe what you expected and what happened. Include whether picture and sound worked.
+    validations:
+      required: true
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Sanitized error or additional details
+      description: Share relevant, redacted diagnostics only. Do not upload complete account-state or DRM files.

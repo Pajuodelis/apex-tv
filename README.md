@@ -1,107 +1,103 @@
 # Apex TV
 
-An independent, open-source **F1 TV client for Samsung Tizen televisions**.
-Install once, sign in with your own F1 TV account on the TV, and watch with
-**no computer running**. The interface supports **English and Lithuanian**.
-The public package starts in English; change it in **Settings → App language**.
-The choice is saved on the TV and does not change the commentary language.
+**Watch F1 TV directly on your Samsung television.**
 
-[Download Apex TV](https://github.com/Pajuodelis/apex-tv/releases/latest/download/Apex-TV.wgt) ·
-[Installation in Lithuanian](INSTALL-LT.md) ·
-[Android / Windows / Mac / Linux installer](https://github.com/Apps2Samsung/Apps2Samsung/releases/latest)
+An independent, open-source F1 TV client for Samsung Tizen TVs. Sign in with
+your own F1 TV account and watch live sessions and replays using your TV
+remote. After installation, no phone or computer needs to stay running.
 
-## Screenshots
+[![Latest release](https://img.shields.io/github/v/release/Pajuodelis/apex-tv)](https://github.com/Pajuodelis/apex-tv/releases/latest)
+[![Build checks](https://github.com/Pajuodelis/apex-tv/actions/workflows/check.yml/badge.svg)](https://github.com/Pajuodelis/apex-tv/actions/workflows/check.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-Screens captured from the English 0.5.5 interface preview using sample data.
-They contain no account credentials or race footage. The player image shows
-its controls and commentary choices; playback verification is described below.
-
-| Home | Language / audio |
-| --- | --- |
-| ![Apex TV Home](docs/screenshots/home-en.jpg) | ![F1 Live and manual International commentary](docs/screenshots/audio-en.jpg) |
-| Settings | English / Lithuanian |
-| ![Apex TV Settings](docs/screenshots/settings-en.jpg) | ![Choose the app language](docs/screenshots/language-en.jpg) |
-
-[Download the TV app and source](DOWNLOADS.md).
-
-## Install — easiest available route
-
-Use the separate open-source **Apps2Samsung** installer. It supports Android
-phones as well as Windows, macOS, and Linux, detects the TV, and signs the
-package for that TV. You do not need to install Tizen Studio for this route.
-
-1. Download **Apps2Samsung** from its own releases and **Apex-TV.wgt** from the
-   download link above. Use an Android phone or a computer on the TV's network.
-2. In Apps2Samsung, find your TV and note the phone/computer's local IP.
-3. On the TV: **Home → Apps → 12345 → Developer Mode ON**. Enter that local
-   IP as the Host PC IP, then fully restart the TV. On a Smart Remote use its
-   **123** key and the on-screen digits. This setup is needed once.
-4. In Apps2Samsung, select your TV, choose **Custom WGT / TPK…** on Android
-   (or the custom `.wgt` file option on desktop), and select **Apex-TV.wgt**.
-   Press **Install**. Complete the Samsung account sign-in if it is requested.
-5. Launch **Apex TV** and sign in with **your own F1 TV account on the TV**.
-   In Samsung Apps settings, use **Add to Home** to pin its icon if available.
-
-After installation the phone and computer can be switched off. A valid F1 TV
-subscription with access to the selected content and an Internet connection
-are still required. This does not unlock Premium features or bypass region,
-account, concurrency, or DRM restrictions.
-
-**Can I install it by USB?** Samsung's current developer documentation says
-application/widget installation through USB is no longer supported. Copying
-this `.wgt` to a USB stick will not install it on a consumer Tizen TV.
-[Samsung's answer](https://developer.samsung.com/smarttv/develop/tools/additional-tools/vscode/connecting-to-tv-device.html)
-
-The released `.wgt` is **unsigned installer input**, not a universally signed
-Samsung application. Apps2Samsung applies your TV's certificate locally.
-Publisher certificates, passwords, and a pre-authorized device list are not
-shared. Back up the installer's own certificates/settings so future native
-package updates can use the same author certificate.
+**[Download the TV app](https://github.com/Pajuodelis/apex-tv/releases/latest/download/Apex-TV.wgt)**
+· [Install in English](INSTALL.md)
+· [Diegimas lietuviškai](INSTALL-LT.md)
+· [All downloads](DOWNLOADS.md)
 
 ## Features
 
-- Standalone TV login, archive, weekend view, and official live catalogue.
-- Native Samsung AVPlay with ordinary Widevine license requests.
-- Driver POV, tracker and data views under Cameras; F1 Live / International and available languages under Audio.
-- F1 Live commentary is selected by default when supplied for the session. Choose English / International manually under Audio.
-- Highest compatible video quality and remote navigation. Back hides player controls first; another press returns to the menu.
-- Resume, favorites, search, playback diagnostics, and signed menu updates.
-- Apple TV-inspired layout, light focus animation, and TV performance tuning.
-- English/Lithuanian menus, player controls, sign-in, and error messages.
+- Browse live sessions, the race weekend and the archive.
+- Choose available driver cameras, the tracker and data views.
+- Switch between F1 Live, International and available commentary languages.
+- Search, save favorites and resume watching.
+- Navigate with your TV remote and use native Samsung AVPlay playback.
+- Choose English or Lithuanian menus independently of commentary language.
+- Receive signed menu and player updates directly on the TV.
 
-## Compatibility and what has actually been tested
+F1 Live commentary is selected by default when available. Choose
+International manually under **Audio**. Press **Back** to hide player controls;
+press it again to return to the menu.
 
-**Tested on Samsung UE55AU7092, Tizen 6.0 (2021)** with moving picture and
-sound: main qualifying, main sprint, a genuine live pre-race studio feed, and the main 2026 Singapore Grand Prix live broadcast.
-The TV fetched its own media and DRM licenses. Archive playback was also
-confirmed after the companion server was stopped.
+## Compatibility
 
-**Main-race moving picture and sound were confirmed on 11 October 2026.** Long-session stability and actual license/key rotation still require separate observation.
-A successful broadcast on this TV does not establish support for every live race or Samsung model.
-The repository is an initial community release, not a guarantee of support
-for all Samsung models. Tizen 6.0 or later is required by the package; other
-models, subscription tiers, and regions need their own tests.
+| Requirement | Details |
+| --- | --- |
+| Television | Samsung TV running **Tizen 6.0 or later** |
+| Account | Your own F1 TV subscription with access to the selected content in your region |
+| Connection | Internet access on the TV |
+| Initial installation | Android phone or Windows, macOS or Linux computer on the same network as the TV |
+| Menu languages | English and Lithuanian; the public package starts in English |
 
-The new Apps2Samsung installation route has been checked against its v2.8.2
-source and the WGT package build, but has **not yet been tested end to end on a
-second person's TV**. Samsung account/certificate steps can vary by model.
+**Verified device: Samsung UE55AU7092 · Tizen 6.0 · 2021.** Picture and sound
+were confirmed for qualifying, sprint, a live pre-race studio feed and the
+main 2026 Singapore Grand Prix broadcast. Main-race playback was confirmed
+on **11 October 2026**. The TV fetched its own media and DRM licenses; archive
+playback was also confirmed with the optional companion server stopped.
+
+Other TV models, regions and subscription tiers still need testing. The
+package's Tizen requirement is not a guarantee of playback on every model.
+Long-session stability and license/key rotation require separate verification.
+The Apps2Samsung installation route was reviewed against its v2.8.2 source
+and the WGT build, but has not yet been tested end to end on another user's TV.
+
+Tried a different model? [Share a compatibility report](https://github.com/Pajuodelis/apex-tv/issues/new?template=compatibility.yml).
+
+<a id="install--easiest-available-route"></a>
+
+## Installation
+
+1. Download [Apex-TV.wgt](https://github.com/Pajuodelis/apex-tv/releases/latest/download/Apex-TV.wgt)
+   and the separate [Apps2Samsung installer](https://github.com/Apps2Samsung/Apps2Samsung/releases/latest).
+2. Enable **Developer Mode** on your TV and connect Apps2Samsung.
+3. Select the custom WGT option and install **Apex-TV.wgt**. Apps2Samsung signs
+   the package locally for your TV.
+4. Open **Apex TV** and sign in with your own F1 TV account on the television.
+
+Follow the full guide for the Developer Mode, network and certificate steps:
+**[English](INSTALL.md)** · **[Lietuviškai](INSTALL-LT.md)**.
+
+After installation, you can switch off the phone or computer. Copying the
+WGT to a USB stick does not install it on a consumer Tizen TV.
+
+## Screenshots
+
+English **v0.5.5** interface previews using sample data. These images show the
+interface, not live race footage or playback verification.
+
+| Home | Audio selection |
+| --- | --- |
+| ![Home with race weekend and archive navigation](docs/screenshots/home-en.jpg) | ![F1 Live and International commentary choices](docs/screenshots/audio-en.jpg) |
+
+| Settings | App language |
+| --- | --- |
+| ![Application settings](docs/screenshots/settings-en.jpg) | ![English and Lithuanian menu language selection](docs/screenshots/language-en.jpg) |
 
 ## Updates
 
-Public menu/player updates are downloaded directly by the TV from
-[this repository's public update feed](https://github.com/Pajuodelis/apex-tv/tree/main/updates).
-They must pass the pinned RSA signature, SHA-256 file integrity, version,
-and rollback checks. No computer, F1 account, or signing private key is
-included in that feed. Updates are applied when playback is idle.
+Menu and player updates arrive directly from the
+[public update feed](https://github.com/Pajuodelis/apex-tv/tree/main/updates)
+and apply when playback is idle. The TV checks their RSA signature, SHA-256
+integrity, version and rollback rules before accepting them.
 
-Changes to the native shell or its permissions still require reinstalling a
-new `.wgt` with the **same installer author certificate**. Losing that
-certificate can require removing and reinstalling the app, which may clear
-local login and preferences. The installer itself is maintained separately.
+Native shell or permission changes require a new WGT installation using the
+**same installer author certificate**. Back up your Apps2Samsung certificates
+and settings; losing the certificate can require reinstalling the app and
+clearing its saved login and preferences.
 
-## Build from source
+## Build and contribute
 
-Use Node.js 22 or newer:
+Requires **Node.js 22 or newer**.
 
 ```sh
 npm ci --ignore-scripts
@@ -110,38 +106,20 @@ npm test
 npm run build:tv
 ```
 
-The resulting **dist/Apex-TV.wgt** can be opened in Apps2Samsung.
-`dist/SHA256SUMS` contains its checksum. No Samsung SDK is needed to build
-this unsigned installer input. Package entries are explicitly allowlisted;
-account sessions, LAN addresses, private keys, and device certificates are
-excluded. A fresh build reconstructs the TV menu from the editable sources.
+The build creates `dist/Apex-TV.wgt` and `dist/SHA256SUMS`. No Samsung SDK or
+publisher private key is needed to build this unsigned installer package.
 
-The distributed bootstrap trusts this project's public update key. For a
-fork with its own updates, replace that public key in `tv/connection.js` and
-the `SOURCE` URL in `web/online-updates.js`, use your own app/package ID, and
-sign updates with your **own** private key outside Git. The publisher's
-private signing key is never required to build or install Apex TV.
+- [Development guide](docs/DEVELOPMENT.md) — architecture, forks and optional companion.
+- [Contributing](CONTRIBUTING.md) — pull requests and testing expectations.
+- [Report a bug](https://github.com/Pajuodelis/apex-tv/issues/new?template=bug-report.yml) — include your model, versions and a sanitized error.
+- [Changelog](CHANGELOG.md) — release history.
+- [Privacy](PRIVACY.md) — account storage, service requests and diagnostics.
 
-### Optional desktop companion
+## License and affiliation
 
-The `companion/` directory preserves the optional Electron login/diagnostic
-and development tools. It is not needed for normal TV playback.
-To use it, copy `companion/config.example.json` to `companion/config.json`,
-set your computer and TV's private IPv4 addresses, run `npm ci` (without
-`--ignore-scripts`, to download Electron), then `npm start`.
+Original Apex TV code is available under the [MIT license](LICENSE).
+Dependencies retain their own licenses; see [third-party notices](THIRD_PARTY_NOTICES.md).
 
-Keep that config, account state, certificates, and update signing keys local.
-Do not run `tools/setup.mjs` over the public standalone bootstrap unless you
-intend to build a separate, locally paired development shell.
-
-## Contributing
-
-Please run the tests and public-source check before sending a pull request.
-For playback reports include the model, Tizen version, Apex TV version,
-content type (replay/live), and the sanitized error. Never attach your F1
-password, tokens, DRM challenges/licenses, TV identifiers, or certificates.
-See [CONTRIBUTING.md](CONTRIBUTING.md) and [privacy notes](PRIVACY.md).
-
-Apex TV original code is **MIT licensed**. Dependencies retain their own
-licenses; see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
-Apex TV is not affiliated with or endorsed by Formula 1 or Samsung.
+Apex TV is not affiliated with or endorsed by Formula 1 or Samsung. It
+requires an eligible F1 TV subscription and respects normal region, account,
+concurrent-screen and DRM restrictions.

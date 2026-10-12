@@ -1,21 +1,53 @@
 # Downloads
 
-- **[Apex-TV.wgt — Samsung TV app](https://github.com/Pajuodelis/apex-tv/releases/latest/download/Apex-TV.wgt)**
-- [Latest release and checksums](https://github.com/Pajuodelis/apex-tv/releases/latest)
-- [Apex-TV-source.zip — open-source package](https://github.com/Pajuodelis/apex-tv/releases/latest/download/Apex-TV-source.zip)
-- [English installation instructions](README.md#install--easiest-available-route)
-- [Diegimas lietuviškai](INSTALL-LT.md)
-- [Screenshots](README.md#screenshots)
+[← Back to Apex TV](README.md)
 
-Use the separate **[Apps2Samsung installer](https://github.com/Apps2Samsung/Apps2Samsung/releases/latest)**
-from its official project for Android, Windows, macOS or Linux. Select the
-custom WGT option and open **Apex-TV.wgt**. It signs the package locally for
-your TV; Apex TV does not distribute private Samsung certificates.
+## Choose your download
 
-The WGT is unsigned installer input. A USB copy alone cannot install it on a
-consumer Tizen TV. After the first network installation, Apex TV runs on the
-TV without a phone or computer. Sign in with your own eligible F1 TV account.
+| File | Use |
+| --- | --- |
+| [Apex-TV.wgt](https://github.com/Pajuodelis/apex-tv/releases/latest/download/Apex-TV.wgt) | Install the app on a Samsung Tizen television |
+| [Apex-TV-source.zip](https://github.com/Pajuodelis/apex-tv/releases/latest/download/Apex-TV-source.zip) | Source packaged for the latest release |
+| [Latest release](https://github.com/Pajuodelis/apex-tv/releases/latest) | Release notes, assets and SHA-256 checksums |
 
-**Verify a download:** compare its SHA-256 with `SHA256SUMS` from the same
-release. On Windows: `Get-FileHash .\Apex-TV.wgt -Algorithm SHA256`.
-On Linux/macOS: `shasum -a 256 Apex-TV.wgt`.
+Use the separate [Apps2Samsung installer](https://github.com/Apps2Samsung/Apps2Samsung/releases/latest)
+for Android, Windows, macOS or Linux. Select its custom WGT option and open
+`Apex-TV.wgt`; it signs the package locally for your TV.
+
+**Installation guides:** [English](INSTALL.md) · [Lietuviškai](INSTALL-LT.md).
+
+The WGT is unsigned installer input. Copying it to USB does not install it
+on a consumer Tizen TV. After installation, the app runs directly on the TV
+with your own eligible F1 TV account.
+
+## Verify your download
+
+Download `SHA256SUMS` from the **same release** as the file you downloaded.
+Compare its expected hash with the value returned by one of these commands.
+
+**Windows PowerShell**
+
+```powershell
+Get-FileHash ./Apex-TV.wgt -Algorithm SHA256
+```
+
+**macOS**
+
+```sh
+shasum -a 256 Apex-TV.wgt
+```
+
+**Linux**
+
+```sh
+sha256sum Apex-TV.wgt
+```
+
+For the source archive, replace the filename with `Apex-TV-source.zip`.
+
+## Developers
+
+To work with the latest repository source, clone
+[Pajuodelis/apex-tv](https://github.com/Pajuodelis/apex-tv) and follow the
+[development guide](docs/DEVELOPMENT.md). Repository HEAD may include changes
+that are not part of the latest packaged release.

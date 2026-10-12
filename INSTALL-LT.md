@@ -1,4 +1,6 @@
-# Kaip įsirašyti Apex TV
+# Apex TV diegimas
+
+[← Grįžti į Apex TV](README.md) · [Installation in English](INSTALL.md)
 
 Reikia Samsung televizoriaus su Tizen 6.0 arba naujesne versija, interneto,
 savo F1 TV prenumeratos ir vienam įrašymui Android telefono arba kompiuterio.
@@ -25,7 +27,7 @@ spausk **123** ir surink juos ekrane. Atsidariusiame lange:
 - **Host PC IP**: įrašyk diegimui naudojamo telefono / kompiuterio IP;
 - patvirtink ir pilnai perkrauk televizorių.
 
-## 3. Įrašyk
+## 3. Įdiek programėlę
 
 Apps2Samsung pasirink savo TV. Android versijoje programėlių pasirinkime
 rinkis **Custom WGT / TPK…**, tada parsisiųstą **Apex-TV.wgt** ir **Install**.
@@ -75,3 +77,10 @@ USB įrašymas paprastame Samsung Tizen TV nebepalaikomas. Vien nukopijuoti
 
 Šis bendruomenės leidimas patikrintas Samsung UE55AU7092 / Tizen 6.0.
 Kiti TV ir naujasis diegimas per Apps2Samsung dar laukia vartotojų bandymų.
+
+[Pranešti apie klaidą](https://github.com/Pajuodelis/apex-tv/issues/new?template=bug-report.yml)
+· [Pasidalinti TV bandymo rezultatu](https://github.com/Pajuodelis/apex-tv/issues/new?template=compatibility.yml)
+
+Nurodyk TV modelį, Tizen ir Apex TV versijas, ar žiūrėjai įrašą, ar tiesioginę
+transliaciją, ir ar veikė vaizdas bei garsas. Neskelbk slaptažodžių, paskyros
+žetonų, DRM duomenų, TV serijos numerių, privačių sertifikatų ar lenktynių vaizdo.

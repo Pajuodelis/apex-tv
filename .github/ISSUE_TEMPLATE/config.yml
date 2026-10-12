@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Installation guide (English)
+    url: https://github.com/Pajuodelis/apex-tv/blob/main/INSTALL.md
+    about: Check installation steps and troubleshooting before opening an issue.
+  - name: Diegimas lietuviškai
+    url: https://github.com/Pajuodelis/apex-tv/blob/main/INSTALL-LT.md
+    about: Diegimo instrukcija ir dažniausių problemų sprendimai lietuviškai.
