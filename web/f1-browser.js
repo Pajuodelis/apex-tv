@@ -556,7 +556,7 @@
       await vaultPut("session", null);
     }
   };
-  var client = new F1Client({ vault }), discovery = window.ApexDiscovery.create(client), tickets = {}, ready = null;
+  var client = new F1Client({ vault }), discovery = window.ApexDiscovery.create(client), editorial = window.ApexEditorial.create(client), tickets = {}, ready = null;
   function companion(ctx, path, body) {
     return new Promise(function(resolve, reject) {
       var xhr = new XMLHttpRequest();
@@ -678,6 +678,7 @@
     if (url.pathname === "/api/live") return { items: await client.live() };
     if (url.pathname === "/api/search") return discovery.search(url.searchParams.get("q"));
     if (url.pathname === "/api/weekend") return discovery.weekend();
+    if (url.pathname === "/api/editorial") return editorial.load(url.searchParams.get("group"), {force:url.searchParams.get("refresh")==="1"});
     if (url.pathname === "/api/channels") return await client.channels(url.searchParams.get("id"));
     if (url.pathname === "/api/diagnostics") {
       var events = await vaultGet("events") || [];
@@ -724,6 +725,7 @@
       return events || [];
     });
   }, client, initialize, request, provision, refresh: refreshSession, login, signOut: function() {
+    editorial.clear(); discovery.clear();
     return client.signOut();
   } };
 })();

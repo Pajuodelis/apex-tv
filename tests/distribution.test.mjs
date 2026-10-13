@@ -18,6 +18,7 @@ test('public WGT builds the full playable UI without personal configuration or d
     assert.ok(files.get('menu/tv-app.js').includes(Buffer.from('ApexNativeRelay')));
     assert.ok(files.get('menu/tv-app.js').includes(Buffer.from('ApexTV')));
     assert.ok(files.get('menu/tv-app.js').includes(Buffer.from('ApexTimeline')));
+    assert.ok(files.get('menu/tv-app.js').includes(Buffer.from('ApexEditorial')));
     assert.ok(files.get('menu/tv-app.js').includes(Buffer.from('ApexSetupChecks')));
     assert.match(files.get('menu/qrcode-LICENSE').toString(),/Copyright \(c\) 2009 Kazuhiko Arase/);
     assert.equal(files.has('author-signature.xml'),false);assert.equal(files.has('signature1.xml'),false);

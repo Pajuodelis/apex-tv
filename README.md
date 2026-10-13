@@ -24,6 +24,8 @@ remote. After installation, no phone or computer needs to stay running.
 - Navigate with your TV remote and use native Samsung AVPlay playback.
 - Choose English or Lithuanian menus independently of commentary language.
 - Receive signed menu and player updates directly on the TV.
+- Browse highlights, Race in 30, official F1 shows and documentaries.
+- Sign in with a clean English or Lithuanian screen and readable inline errors.
 - Follow a first-run guide for sign-in, picture/sound checks and Add to Home.
 - Run compatibility checks and share an allowlisted diagnostic report as a local QR code.
 - Use four primary player actions and a remote timeline: Up, arrows to choose, OK to seek; holding an arrow accelerates.
@@ -95,6 +97,14 @@ New **v0.5.6** previews, also using sample data:
 | ![First-run setup guide](docs/screenshots/setup-en.png) | ![Choose a time, then confirm with OK](docs/screenshots/timeline-en.png) |
 
 ![Local compatibility report with a QR code](docs/screenshots/compatibility-en.png)
+
+## New in v0.5.7
+
+Browser previews below use sample data. No real account details or race footage are included.
+
+| Clean sign-in | Highlights and shows |
+| --- | --- |
+| ![Clean sign-in screen](docs/screenshots/login-clean.jpg) | ![Highlights and shows](docs/screenshots/highlights-en.png) |
 
 ## Updates
 

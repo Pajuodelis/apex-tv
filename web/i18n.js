@@ -2,6 +2,9 @@
 (function(root,factory){var api=factory(root);if(typeof module==='object'&&module.exports)module.exports=api;else root.ApexI18n=api;}(typeof window!=='undefined'?window:globalThis,function(root){
   'use strict';
   var EN={
+  "Pavadinimas, GP ar sesija": "Title, GP or session",
+  "Apžvalgos ir laidos": "Highlights & shows",
+  "APŽVALGOS IR LAIDOS": "HIGHLIGHTS & SHOWS",
   "Treniruotė": "Practice",
   "· vietos laiku.": "· local time.",
   "Mėgstamą lenktynininką pasieksi grotuvo skiltyje Daugiau. Kamerą parenkame iš konkrečios sesijos F1 sąrašo.": "Open More in the player to choose your favorite driver. F1 must offer the camera for the current session.",

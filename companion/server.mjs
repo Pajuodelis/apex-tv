@@ -1,4 +1,5 @@
 import Discovery from '../web/discovery.js';
+import Editorial from '../web/editorial.js';
 import http from 'node:http';
 import ViewOptions from '../web/view-options.js';
 import VideoQuality from '../web/video-quality.js';
@@ -24,7 +25,7 @@ async function body(req, max = 1024 * 1024) {
 }
 export async function createApp({ setupData, client = new F1Client(), actions = {}, root = defaultRoot }) {
   const { config, pairingKey, privateKey, publicKey } = setupData;
-  const releases = new Releases(root, privateKey), discovery = Discovery.create(client);
+  const releases = new Releases(root, privateKey), discovery = Discovery.create(client), editorial = Editorial.create(client);
   await releases.publish();
   const streams = new Map(), diagnostics = [];
   let tvCommand = null, tvPlaybackPreference = null;
@@ -82,7 +83,7 @@ export async function createApp({ setupData, client = new F1Client(), actions = 
         }
         if (url.pathname === '/admin/state' && req.method === 'GET') return send({ csrf, account: client.status(), config, revision: releases.current.revision, diagnostics: diagnostics.slice(-30), playback: client.playbackInfo, license: client.licenceInfo, transport: client.transportInfo });
         if (url.pathname === '/admin/login' && req.method === 'POST') { if (!actions.login) throw new ServiceError('Paleisk programėlę su npm start, kad atsidarytų F1 langas.', 503); await actions.login(); return send({ ok: true }); }
-        if (url.pathname === '/admin/logout' && req.method === 'POST') { await client.signOut(); streams.clear(); tvCommand = null; tvPlaybackPreference = null; await actions.logout?.(); return send({ ok: true }); }
+        if (url.pathname === '/admin/logout' && req.method === 'POST') { await client.signOut(); editorial.clear(); discovery.clear(); streams.clear(); tvCommand = null; tvPlaybackPreference = null; await actions.logout?.(); return send({ ok: true }); }
         if (url.pathname === '/admin/restart' && req.method === 'POST') {
           if (!actions.restart) throw new ServiceError('Perkrovimas pasiekiamas tik Apex TV programoje.', 503);
           send({ ok: true }); await actions.restart(); return;
@@ -196,6 +197,7 @@ export async function createApp({ setupData, client = new F1Client(), actions = 
       if (url.pathname === '/api/live' && req.method === 'GET') return send({ items: await client.live() });
       if (url.pathname === '/api/search' && req.method === 'GET') return send(await discovery.search(url.searchParams.get('q')));
       if (url.pathname === '/api/weekend' && req.method === 'GET') return send(await discovery.weekend());
+      if (url.pathname === '/api/editorial' && req.method === 'GET') return send(await editorial.load(url.searchParams.get('group'),{force:url.searchParams.get('refresh')==='1'}));
       if (url.pathname === '/api/channels' && req.method === 'GET') return send(await client.channels(url.searchParams.get('id')));
       if (url.pathname === '/api/play' && req.method === 'POST') {
         let data; try { data = JSON.parse(await body(req, 4096)); } catch { throw new ServiceError('Netinkama užklausa.', 400); }

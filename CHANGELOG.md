@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.5.7 — 2026-10-13
+
+- New Highlights & shows section: highlights, Race in 30, official F1 shows and documentaries, including recent GP selections.
+- Category navigation, search, pagination and Back restore the previous selection; cached requests limit work on the TV.
+- Cleaner sign-in screen with a single card, clear field labels, a full-width button and readable inline errors. English and Lithuanian are supported.
+- Failed sign-in clears the password and returns focus to the password field. Authentication and encrypted session storage are unchanged.
+- Validated with automated tests, official catalogue metadata and browser previews. Physical TV testing of this release is pending; earlier live/replay playback evidence is not a new test of 0.5.7.
+
 ## 0.5.6 — 2026-10-12
 
 - First-run guide: TV sign-in, human-confirmed picture/sound tests, Samsung Home instructions and saved progress.

@@ -2351,6 +2351,9 @@ return{store:store,identity:identity,platform:platform,report:report,failureCode
 (function(root,factory){var api=factory(root);if(typeof module==='object'&&module.exports)module.exports=api;else root.ApexI18n=api;}(typeof window!=='undefined'?window:globalThis,function(root){
   'use strict';
   var EN={
+  "Pavadinimas, GP ar sesija": "Title, GP or session",
+  "Apžvalgos ir laidos": "Highlights & shows",
+  "APŽVALGOS IR LAIDOS": "HIGHLIGHTS & SHOWS",
   "Treniruotė": "Practice",
   "· vietos laiku.": "· local time.",
   "Mėgstamą lenktynininką pasieksi grotuvo skiltyje Daugiau. Kamerą parenkame iš konkrečios sesijos F1 sąrašo.": "Open More in the player to choose your favorite driver. F1 must offer the camera for the current session.",
@@ -2970,6 +2973,57 @@ return{controller:controller};
   return{normalize:normalize,picture:picture,date:date,query:query,search:search,chooseMeeting:chooseMeeting,program:program,create:create,localTime:localTime};
 }));
 ;
+/* F1 editorial catalogue. Public metadata only; playback and DRM are unchanged. */
+(function(root,factory){var api=factory(typeof module==='object'&&module.exports?require('./discovery.js'):root.ApexDiscovery);if(typeof module==='object'&&module.exports)module.exports=api;else root.ApexEditorial=api;}(typeof window!=='undefined'?window:globalThis,function(D){
+  'use strict';
+  var ORIGIN='https://f1tv.formula1.com',TTL=600000,LIMIT=240;
+  var GROUPS=[
+    {id:'highlights',lt:'Apžvalgos',en:'Highlights',descriptionLt:'Lenktynių, kvalifikacijos, sprinto ir treniruočių svarbiausi momentai.',descriptionEn:'Race, qualifying, sprint and practice highlights.',query:'Highlights'},
+    {id:'race30',lt:'Race in 30',en:'Race in 30',descriptionLt:'Lenktynės per maždaug 30 minučių.',descriptionEn:'The race in around 30 minutes.',query:'Race in 30'},
+    {id:'shows',lt:'Laidos',en:'Shows',descriptionLt:'Tech Talk, analizė, pokalbiai ir laidos prieš sesijas bei po jų.',descriptionEn:'Tech Talk, analysis, interviews and pre/post-session shows.',page:'410'},
+    {id:'documentaries',lt:'Dokumentika',en:'Documentaries',descriptionLt:'F1 istorijos, dokumentiniai filmai ir serialai.',descriptionEn:'F1 stories, documentary films and series.',page:'413'}
+  ];
+  function clean(v,n){return String(v||'').replace(/[\x00-\x1f\x7f]/g,'').trim().slice(0,n||240);}
+  function group(id){return GROUPS.filter(function(g){return g.id===id;})[0]||null;}
+  function classify(raw){var name=clean(raw&&raw.title).toLowerCase();if(name.normalize)name=name.normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+    if(/\brace\s+in\s+30\b/.test(name))return 'race30';
+    if(/\bhighlights?\b|svarbiausi|apzvalg/.test(name))return 'highlights';
+    if(/(?:pre|post)[- ](?:race|sprint|qualifying)\s+show|tech\s*talk|jolyon palmer|cooldown|weekend (?:warm.?up|wrapped)|radio rewind|best of team radio|off the grid|lap of luxury/.test(name))return 'shows';
+    if(/documentar|chasing the dream|beyond all limits|inside story|f1 icons|greatest comebacks/.test(name))return 'documentaries';return '';
+  }
+  function safe(raw){if(!raw||!/^\d{1,12}$/.test(String(raw.id))||!clean(raw.title))return null;var value={id:String(raw.id),title:clean(raw.title),kind:['page','detail','video'].indexOf(raw.kind)>=0?raw.kind:'video',duration:Math.max(0,Math.min(604800,Number(raw.duration)||0)),live:raw.live===true,locked:raw.locked===true,image:D.picture(raw.image),subtitle:clean(raw.subtitle,180),location:clean(raw.location,100),series:clean(raw.series,40)};['start','end','meetingStart','meetingEnd'].forEach(function(k){value[k]=D.date(raw[k]);});return value;}
+  // Series rails sometimes shorten every episode title to the GP name. Keep the
+  // service's full content title so flattened pre/post-session shows are distinct.
+  function normalize(data){var values=D.normalize(data,{limit:LIMIT}),titles={},visited=0;
+    function walk(n,depth){if(!n||typeof n!=='object'||depth>14||visited++>6000)return;if(Array.isArray(n)){n.slice(0,500).forEach(function(v){walk(v,depth+1);});return;}var m=n.metadata||{};if(/^\d{1,12}$/.test(String(m.contentId))&&clean(m.title))titles[String(m.contentId)]=clean(m.title);['containers','items','resultObj','retrieveItems','events'].forEach(function(k){walk(n[k],depth+1);});}
+    walk(data,0);return values.map(function(v){var value=safe(v);if(value&&value.kind==='video'&&titles[value.id])value.title=titles[value.id];return value;}).filter(Boolean);
+  }
+  function merge(lists,kind,now){var seen={},out=[];now=now||Date.now();lists.forEach(function(list){(Array.isArray(list)?list:[]).slice(0,LIMIT).forEach(function(raw){var v=safe(raw);if(!v||v.live||v.locked||v.kind==='video'&&v.start>now)return;if(kind==='highlights'||kind==='race30'){if(v.kind!=='video'||classify(v)!==kind)return;}var key=v.kind+':'+v.id;if(seen[key])return;seen[key]=true;out.push(v);});});
+    return out.map(function(v,i){return{value:v,index:i};}).sort(function(a,b){var av=a.value,bv=b.value;if(av.kind==='video'&&bv.kind!=='video')return 1;if(av.kind!=='video'&&bv.kind==='video')return -1;if(av.kind==='video'&&bv.kind==='video'){var byDate=(bv.start||0)-(av.start||0);if(byDate)return byDate;}return a.index-b.index;}).slice(0,LIMIT).map(function(e){return e.value;});
+  }
+  function recentMeetings(items,now){return items.map(safe).filter(function(v){return v&&v.kind!=='video'&&v.meetingStart&&v.meetingStart<=now&&(!v.series||/formula\s*1|^f1$/i.test(v.series));}).sort(function(a,b){return b.meetingStart-a.meetingStart;}).slice(0,2);}
+  function create(client,clock){clock=clock||Date.now;var cached={},pending={},recentCache=null,recentPending=null,epoch=0,active=0,queue=[];
+    function copy(v){return JSON.parse(JSON.stringify(v));}
+    function pump(){while(active<2&&queue.length){var task=queue.shift();active++;(function(t){Promise.resolve().then(t.run).then(t.resolve,t.reject).then(function(){active--;pump();});})(task);}}
+    function enqueue(run){return new Promise(function(resolve,reject){queue.push({run:run,resolve:resolve,reject:reject});pump();});}
+    function changed(generation){if(generation!==epoch)throw Object.assign(Error('F1 katalogas pasikeitė. Bandyk dar kartą.'),{status:409});}
+    function read(id,detail){return enqueue(async function(){var ctx=await client.context(true),route=detail?'/4.0/'+ctx.login+'/ENG/WEB_DASH/ALL/CONTENT/VIDEO/'+id+'/'+ctx.tail:'/2.0/'+ctx.login+'/ENG/WEB_DASH/ALL/PAGE/'+id+'/'+ctx.tail;return normalize(await client.json(ORIGIN+route,client.headers())).filter(function(v){return v.kind!=='page'||v.id!==String(id);});});}
+    function search(q){return enqueue(async function(){var ctx=await client.context(true);return normalize(await client.json(ORIGIN+'/2.0/'+ctx.login+'/ENG/WEB_DASH/ALL/PAGE/5234/'+ctx.tail+'?search='+encodeURIComponent(q),client.headers()));});}
+    async function recent(force){var now=clock(),generation=epoch;if(!force&&recentCache&&now-recentCache.at<TTL)return copy(recentCache);if(recentPending)return recentPending;
+      var promise=(async function(){var seasons=await enqueue(function(){return client.page('493');});changed(generation);var season=seasons.filter(function(v){return v.kind==='page'&&/\b(?:19|20)\d{2}\b/.test(v.title);}).sort(function(a,b){return Number((b.title.match(/(?:19|20)\d{2}/)||['0'])[0])-Number((a.title.match(/(?:19|20)\d{2}/)||['0'])[0]);})[0];if(!season)throw Error('F1 nepateikė naujausio sezono.');var meetings=recentMeetings(await read(season.id),now);changed(generation);if(!meetings.length)throw Error('F1 nepateikė įvykusių GP datų.');
+        var pages=await collect(meetings.map(function(meeting){return async function(){var values=await read(meeting.id,meeting.kind==='detail');return values.map(function(raw){var v=safe(raw),location=meeting.location||clean(meeting.subtitle)||clean(meeting.title);if(!v)return null;if(v.kind==='video'&&classify(v)){if(!v.location)v.location=location;if(/^(?:(?:race|qualifying|sprint(?: qualifying)?|practice\s*\d+)\s+highlights|race\s+in\s+30)$/i.test(v.title)&&location)v.title=clean(v.title+' · '+location);}return v;}).filter(Boolean);};}));changed(generation);var value={items:pages.values.reduce(function(all,v){return all.concat(v);},[]),partial:pages.partial,at:now};if(!value.partial)recentCache=value;return copy(value);
+      }());recentPending=promise;try{return await promise;}finally{if(recentPending===promise)recentPending=null;}
+    }
+    async function collect(tasks){var results=await Promise.all(tasks.map(function(run){return Promise.resolve().then(run).then(function(value){return{value:Array.isArray(value)?{items:value,partial:false}:value};},function(error){return{error:error};});}));var failures=results.filter(function(r){return r.error;}),success=results.filter(function(r){return r.value;});var access=failures.filter(function(r){return r.error.status===401||r.error.status===403;})[0];if(access)throw access.error;if(!success.length)throw failures[0].error;return{values:success.map(function(r){return r.value.items;}),partial:failures.length>0||success.some(function(r){return r.value.partial;})};}
+    async function load(id,options){var selected=group(id);if(!selected)throw Object.assign(Error('Nežinoma F1 katalogo skiltis.'),{status:400});await client.context(true);var now=clock(),generation=epoch,force=options&&options.force;if(!force&&cached[id]&&now-cached[id].at<TTL)return copy(cached[id]);if(pending[id])return pending[id];
+      var promise=(async function(){var tasks=[];if(selected.page)tasks.push(function(){return read(selected.page);});else tasks.push(function(){return search(selected.query);});if(id!=='documentaries')tasks.unshift(async function(){var values=await recent(force);return{items:id==='shows'?values.items.filter(function(v){return classify(v)==='shows';}):values.items,partial:values.partial};});var result=await collect(tasks);changed(generation);var value={group:id,items:merge(result.values,id,now),at:now,partial:result.partial,selection:true};if(!value.partial)cached[id]=value;return copy(value);}());pending[id]=promise;try{return await promise;}finally{if(pending[id]===promise)pending[id]=null;}
+    }
+    return{load:load,clear:function(){epoch++;cached={};pending={};recentCache=null;recentPending=null;}};
+  }
+  return{groups:GROUPS,group:group,classify:classify,normalize:normalize,merge:merge,recentMeetings:recentMeetings,create:create,TTL:TTL,LIMIT:LIMIT};
+}));
+
+;
 /* Bounded playback recovery and quality decisions. No credentials or media bytes. */
 (function(root,factory){var api=factory();if(typeof module==='object'&&module.exports)module.exports=api;else root.ApexPlaybackHealth=api;}(typeof window!=='undefined'?window:globalThis,function(){
   'use strict';
@@ -3137,6 +3191,7 @@ var api={mode:mode,select:select,fps:fps,label:label};if(typeof module!=='undefi
   function category(raw) {
     var name = fold(raw.title);
     if (/\bkids\b/.test(name)) return 'kids';
+    if (/\brace\s+in\s+30\b/.test(name)) return 'race30';
     if (/highlights|svarbiausi|momentai/.test(name)) return 'highlights';
     if (/practice|treniruot/.test(name)) return 'practice';
     if (/sprint/.test(name)) return 'sprint';
@@ -3178,6 +3233,7 @@ var api={mode:mode,select:select,fps:fps,label:label};if(typeof module!=='undefi
   var api = { store: store, cache: cache, item: item, select: select, page: page, category: category, resume: resume, completed: completed, time: time, seekTarget: seekTarget, explain: explain, PAGE_SIZE: PAGE_SIZE };
   global.ApexExperience = api; if (typeof module === 'object' && module.exports) module.exports = api;
 }(typeof window !== 'undefined' ? window : globalThis));
+
 ;
 /* Service-supplied viewing choices. No invented feeds or audio languages. ES5 for Tizen 6. */
 (function (root, factory) {
@@ -3797,7 +3853,7 @@ var api={mode:mode,select:select,fps:fps,label:label};if(typeof module!=='undefi
       await vaultPut("session", null);
     }
   };
-  var client = new F1Client({ vault }), discovery = window.ApexDiscovery.create(client), tickets = {}, ready = null;
+  var client = new F1Client({ vault }), discovery = window.ApexDiscovery.create(client), editorial = window.ApexEditorial.create(client), tickets = {}, ready = null;
   function companion(ctx, path, body) {
     return new Promise(function(resolve, reject) {
       var xhr = new XMLHttpRequest();
@@ -3919,6 +3975,7 @@ var api={mode:mode,select:select,fps:fps,label:label};if(typeof module!=='undefi
     if (url.pathname === "/api/live") return { items: await client.live() };
     if (url.pathname === "/api/search") return discovery.search(url.searchParams.get("q"));
     if (url.pathname === "/api/weekend") return discovery.weekend();
+    if (url.pathname === "/api/editorial") return editorial.load(url.searchParams.get("group"), {force:url.searchParams.get("refresh")==="1"});
     if (url.pathname === "/api/channels") return await client.channels(url.searchParams.get("id"));
     if (url.pathname === "/api/diagnostics") {
       var events = await vaultGet("events") || [];
@@ -3965,6 +4022,7 @@ var api={mode:mode,select:select,fps:fps,label:label};if(typeof module!=='undefi
       return events || [];
     });
   }, client, initialize, request, provision, refresh: refreshSession, login, signOut: function() {
+    editorial.clear(); discovery.clear();
     return client.signOut();
   } };
 })();
@@ -5082,8 +5140,8 @@ window.ApexProtectionProbe = {
     var connected=account&&account.signedIn,badge=focusKey(button('',function(){showTab('settings','Nustatymai');},'account'+(connected?' connected':'')),'account-settings');I18n.attr(badge, 'aria-label', connected?'F1 TV paskyra ir nustatymai':'Prisijungti prie F1 TV');
     var avatar=node('span','F1','account-avatar');avatar.setAttribute('aria-hidden','true');avatar.appendChild(node('span','','account-dot'));badge.appendChild(avatar);var copy=node('span','','account-copy');copy.appendChild(node('span',connected?'F1 TV':'Prisijungti'));copy.appendChild(node('small',connected?'Prisijungta':'F1 TV paskyra'));badge.appendChild(copy);header.appendChild(badge);
     var nav=node('nav','','tv-nav');I18n.attr(nav, 'aria-label', 'Pagrindinis meniu');
-    [['search','Paieška'],['home','Pradžia'],['weekend','Savaitgalis'],['live','Tiesiogiai'],['archive','Įrašai'],['saved','Mano sąrašas'],['settings','Nustatymai']].forEach(function(entry){var b=focusKey(button('',function(){showTab(entry[0],entry[1]);},entry[0]===current.tab?'selected':''),'nav-'+entry[0]);I18n.attr(b, 'aria-label', entry[1]);I18n.attr(b,'title',entry[1]);b.appendChild(icon(entry[0]));b.appendChild(node('span',entry[1],'nav-label'));if(entry[0]===current.tab)b.setAttribute('aria-current','page');nav.appendChild(b);});header.appendChild(nav);shell.appendChild(header);
-    var main=node('main','','tv-main'+(current.tab==='home'&&!current.video?' tv-home':''));if(current.tab!=='home'||current.video){var top=node('div','','tv-topline'),heading=node('div','','page-heading');if(stack.length){var trail=node('div','','breadcrumbs');I18n.attr(trail, 'aria-label', 'Vieta bibliotekoje');stack.forEach(function(view,i){if(i)trail.appendChild(node('span','›','breadcrumb-divider'));trail.appendChild(node('span',view.title));});heading.appendChild(trail);}else heading.appendChild(node('span',current.tab==='archive'?'F1 TV BIBLIOTEKA':current.tab==='live'?'DABAR ETERYJE':current.tab==='weekend'?'VARŽYBŲ SAVAITGALIS':current.tab==='search'?'VISA F1 TV BIBLIOTEKA':'TAVO APEX TV','eyebrow'));if(!current.video)heading.appendChild(node('h1',current.title));top.appendChild(heading);if(stack.length){var back=focusKey(button('← Atgal',goBack,'secondary-button'),'back');back.setAttribute('data-back-focus','true');top.appendChild(back);}main.appendChild(top);}
+    [['search','Paieška'],['home','Pradžia'],['weekend','Savaitgalis'],['live','Tiesiogiai'],['archive','Įrašai'],['editorial','Apžvalgos ir laidos'],['saved','Mano sąrašas'],['settings','Nustatymai']].forEach(function(entry){var b=focusKey(button('',function(){showTab(entry[0],entry[1]);},entry[0]===current.tab?'selected':''),'nav-'+entry[0]);I18n.attr(b, 'aria-label', entry[1]);I18n.attr(b,'title',entry[1]);b.appendChild(icon(entry[0]));b.appendChild(node('span',entry[1],'nav-label'));if(entry[0]===current.tab)b.setAttribute('aria-current','page');nav.appendChild(b);});header.appendChild(nav);shell.appendChild(header);
+    var main=node('main','','tv-main'+(current.tab==='home'&&!current.video?' tv-home':''));if(current.tab!=='home'||current.video){var top=node('div','','tv-topline'),heading=node('div','','page-heading');if(stack.length){var trail=node('div','','breadcrumbs');I18n.attr(trail, 'aria-label', 'Vieta bibliotekoje');stack.forEach(function(view,i){if(i)trail.appendChild(node('span','›','breadcrumb-divider'));trail.appendChild(node('span',view.title));});heading.appendChild(trail);}else heading.appendChild(node('span',current.tab==='editorial'?'APŽVALGOS IR LAIDOS':current.tab==='archive'?'F1 TV BIBLIOTEKA':current.tab==='live'?'DABAR ETERYJE':current.tab==='weekend'?'VARŽYBŲ SAVAITGALIS':current.tab==='search'?'VISA F1 TV BIBLIOTEKA':'TAVO APEX TV','eyebrow'));if(!current.video)heading.appendChild(node('h1',current.title));top.appendChild(heading);if(stack.length){var back=focusKey(button('← Atgal',goBack,'secondary-button'),'back');back.setAttribute('data-back-focus','true');top.appendChild(back);}main.appendChild(top);}
     var connection=node('p','','connection-banner');connection.hidden=true;connection.setAttribute('role','status');main.insertBefore(connection,main.firstChild);shell.appendChild(main);
     var footer=node('footer','','tv-footer'),hints=node('div','','remote-hints');[['↔ ↕','Pasirinkti'],['OK','Atidaryti'],['←','Meniu']].forEach(function(hint){var part=node('span','','remote-hint');part.appendChild(node('span',hint[0],'remote-key'));part.appendChild(node('span',hint[1]));hints.appendChild(part);});footer.appendChild(hints);footer.appendChild(focusKey(button('Pultelio pagalba',help,'footer-help'),'footer-help'));footer.appendChild(node('span','APEX TV / '+ctx.version,'footer-version'));shell.appendChild(footer);root.appendChild(shell);renderedView=current;return main;
   }
@@ -5195,7 +5253,7 @@ window.ApexProtectionProbe = {
   }
   function itemCard(item, key) {
     var progress = localStore.get(item.id), year = (item.title.match(/(?:19|20)\d{2}/) || [])[0];
-    var subtitle = item.kind === 'video' ? (item.live ? 'Tiesioginė transliacija' : (progress && progress.completed ? 'Peržiūrėta' : 'Įrašas') + (item.duration ? ' · ' + durationLabel(item.duration) : '')) : item.kind === 'page' ? 'Sezonai ir GP įrašai' : 'Sesijos ir svarbiausi momentai';
+    var subtitle = item.kind === 'video' ? (item.live ? 'Tiesioginė transliacija' : (progress && progress.completed ? 'Peržiūrėta' : 'Įrašas') + (item.duration ? ' · ' + durationLabel(item.duration) : '')) : current.tab==='editorial' ? setupText('Epizodai ir kolekcijos','Episodes and collections') : item.kind === 'page' ? 'Sezonai ir GP įrašai' : 'Sesijos ir svarbiausi momentai';
     var card = contentCard(item.title, subtitle, function () { openItem(item); }, { key: key || 'content-'+item.kind+'-'+item.id, image:item.image, art: item.live ? 'live' : /singapore/i.test(item.title) ? 'singapore' : 'collection', year:year, badge:item.live ? 'TIESIOGIAI' : localStore.isFavorite(item.id) ? '♥ MANO SĄRAŠAS' : progress && progress.completed ? '✓ PERŽIŪRĖTA' : '', play:item.kind === 'video' });
     if (progress && !item.live && progress.duration && !progress.completed) {
       var bar = node('div', '', 'card-progress'), fill = node('span'); fill.style.width = Math.min(100,progress.position/progress.duration*100)+'%'; bar.setAttribute('aria-hidden','true'); bar.appendChild(fill); card.querySelector('.card-visual').appendChild(bar);
@@ -5211,7 +5269,7 @@ window.ApexProtectionProbe = {
   try{driverStore=Drivers.store(window.localStorage);}catch(_){driverStore=Drivers.store(null);}
   var weekendData=null,weekendBusy=false,recoveryPending=null,recoveryTimer=0,recoverySerial=0,lastMenuInput=Date.now(),updateService=null;
   function icon(name){
-    var paths={home:'M3 10.5 12 3l9 7.5V21h-6v-7H9v7H3Z',search:'M10 3a7 7 0 1 0 0 14 7 7 0 0 0 0-14m5 12 6 6',live:'M4 4h16v16H4Zm5 3v10l8-5Z',weekend:'M4 5h16v16H4ZM7 2v6m10-6v6M4 10h16',archive:'M3 4h8v7H3Zm10 0h8v7h-8ZM3 13h8v7H3Zm10 0h8v7h-8Z',saved:'M12 21 3.5 12.5C-2 6.5 7-1 12 6c5-7 14 .5 8.5 6.5Z',settings:'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18m0 5a4 4 0 1 0 0 8 4 4 0 0 0 0-8'};
+    var paths={home:'M3 10.5 12 3l9 7.5V21h-6v-7H9v7H3Z',search:'M10 3a7 7 0 1 0 0 14 7 7 0 0 0 0-14m5 12 6 6',live:'M4 4h16v16H4Zm5 3v10l8-5Z',weekend:'M4 5h16v16H4ZM7 2v6m10-6v6M4 10h16',editorial:'M3 4h18v16H3ZM3 9h18M7 4l4 5m3-5 4 5m-8 4v4l4-2Z',archive:'M3 4h8v7H3Zm10 0h8v7h-8ZM3 13h8v7H3Zm10 0h8v7h-8Z',saved:'M12 21 3.5 12.5C-2 6.5 7-1 12 6c5-7 14 .5 8.5 6.5Z',settings:'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18m0 5a4 4 0 1 0 0 8 4 4 0 0 0 0-8'};
     var svg=document.createElementNS('http://www.w3.org/2000/svg','svg');svg.setAttribute('viewBox','0 0 24 24');svg.setAttribute('aria-hidden','true');svg.setAttribute('class','menu-icon');var path=document.createElementNS(svg.namespaceURI,'path');path.setAttribute('d',paths[name]||paths.home);path.setAttribute('fill','none');path.setAttribute('stroke','currentColor');path.setAttribute('stroke-width','1.7');path.setAttribute('stroke-linejoin','round');path.setAttribute('stroke-linecap','round');svg.appendChild(path);return svg;
   }
   function imageArtwork(parent,source,large){
@@ -5297,11 +5355,38 @@ window.ApexProtectionProbe = {
     var section=node('section','','home-section discovery-section'),head=node('div','','section-heading');head.appendChild(node('h2','Atrask daugiau'));section.appendChild(head);var cards=node('div','','tiles home-tiles');
     cards.appendChild(contentCard('Tiesiogiai','Kas dabar vyksta trasoje',function(){showTab('live','Tiesiogiai');},{key:'discover-live',art:'live',badge:'F1 TV'}));
     cards.appendChild(contentCard('Visas archyvas','Sezonai, GP ir tavo mėgstamos sesijos',function(){showTab('archive','Įrašai');},{key:'discover-library',art:'collection',year:'F1'}));
+    cards.appendChild(contentCard(editorialTitle(),setupText('Apžvalgos, Race in 30, laidos ir dokumentika','Highlights, Race in 30, shows and documentaries'),function(){openEditorial('highlights');},{key:'discover-editorial',art:'collection',year:'F1 TV'}));
     cards.appendChild(contentCard('Mano sąrašas','Mėgstami įrašai: '+state.favorites.length,function(){showTab('saved','Mano sąrašas');},{key:'discover-saved',art:'collection',year:'♥'}));
     cards.appendChild(contentCard('Žiūrėjimo istorija','Žiūrėti įrašai: '+state.progress.length,function(){showTab('history','Žiūrėjimo istorija');},{key:'discover-history',art:'collection',year:'↶'}));section.appendChild(cards);main.appendChild(section);
+    if(signedIn)renderHomeEditorial(main);
     rail(main,'Neseniai atidaryti',state.recent,'recent');rail(main,'Tavo mėgstami įrašai',state.favorites,'saved');
     if(signedIn){if(weekendData){renderWeekendPanel(main,weekendData,true);updateHomeFeature(main,weekendData);}loadWeekend(main,true,false);liveTimer=setInterval(function(){loadWeekend(main,true,false);},30000);}
   }
+
+  var Editorial=window.ApexEditorial,editorialCache={},editorialPending={};
+  function editorialTitle(){return setupText('Apžvalgos ir laidos','Highlights & shows');}
+  function editorialGroupTitle(group){var value=Editorial.group(group);return value?setupText(value.lt,value.en):editorialTitle();}
+  function openEditorial(group){cancelRecovery();stack=[];current={tab:'editorial',title:editorialTitle(),editorialGroup:Editorial.group(group)?group:'highlights'};render();}
+  function editorialSearch(group){rememberView();stack.push(current);current={tab:'search',title:setupText('Paieška','Search'),searchTerm:Editorial.group(group).query||''};render();}
+  function getEditorial(group,force){var saved=editorialCache[group];if(!force&&saved&&Date.now()-saved.at<Editorial.TTL)return Promise.resolve(saved);if(editorialPending[group])return editorialPending[group];var promise=request('/api/editorial?group='+encodeURIComponent(group)+(force?'&refresh=1':''));editorialPending[group]=promise;promise.then(function(data){if(editorialPending[group]!==promise)return;editorialCache[group]=data;delete editorialPending[group];},function(){if(editorialPending[group]===promise)delete editorialPending[group];});return promise;}
+  function editorialLoading(host,home){var loading=node('div','','catalog-loading editorial-loading');loading.setAttribute('role','status');loading.appendChild(node('p',setupText('Įkeliamas F1 turinys…','Loading F1 content…'),'loading-state'));var skeleton=node('div','',home?'tiles':'skeleton-grid');skeleton.setAttribute('aria-hidden','true');for(var i=0;i<4;i++)skeleton.appendChild(node('div','','skeleton-card'));loading.appendChild(skeleton);host.appendChild(loading);return loading;}
+  function renderEditorial(main){var view=current,group=Editorial.group(view.editorialGroup)?view.editorialGroup:'highlights';view.editorialGroup=group;
+    var intro=node('section','','editorial-intro'),tabs=node('div','','editorial-tabs');tabs.setAttribute('aria-label',setupText('Turinio rūšis','Content category'));
+    Editorial.groups.forEach(function(value){var b=focusKey(button(setupText(value.lt,value.en),function(){if(current.editorialGroup===value.id)return;rememberView();current.editorialGroup=value.id;current.query='';current.filter='all';current.offset=0;current.focusKey='editorial-'+value.id;current.scrollTop=0;render();},'editorial-tab'+(group===value.id?' active':'')),'editorial-'+value.id);b.setAttribute('aria-pressed',String(group===value.id));if(group===value.id)b.setAttribute('data-default-focus','true');tabs.appendChild(b);});intro.appendChild(tabs);
+    var selected=Editorial.group(group);intro.appendChild(node('p',setupText(selected.descriptionLt,selected.descriptionEn),'editorial-description'));
+    var actions=node('div','','editorial-actions'),refresh=focusKey(button(setupText('Atnaujinti','Refresh'),function(){load(true);},'secondary-button'),'editorial-refresh');actions.appendChild(refresh);actions.appendChild(focusKey(button(setupText('Ieškoti visame F1 TV','Search all F1 TV'),function(){editorialSearch(group);},'secondary-button'),'editorial-search'));intro.appendChild(actions);
+    var note=node('p',setupText('F1 pateikta atranka. Daugiau įrašų rasi paieškoje arba atvėręs kolekciją.','A selection from F1. Find more in Search or open a collection.'),'settings-note');note.setAttribute('role','status');intro.appendChild(note);main.appendChild(intro);
+    var host=node('div','','editorial-results');main.appendChild(host);
+    function active(){return current===view&&view.editorialGroup===group&&!playing&&document.contains(host);}
+    function paint(data){if(!active())return;var focused=host.contains(document.activeElement),key=focused&&document.activeElement.getAttribute('data-focus-key'),shell=root.querySelector('.tv-shell'),top=shell&&shell.scrollTop;host.textContent='';if(data.items.length){renderItems(host,data.items,data.at,data.partial);if(key){view.focusKey=key;view.scrollTop=top;setFocus();}}else{var empty=node('section','','empty-state');empty.appendChild(node('h2',setupText('F1 šios kategorijos turinio nepateikė','F1 returned no content for this category')));empty.appendChild(node('p',setupText('Bandyk paiešką arba kitą kategoriją.','Try Search or another category.')));host.appendChild(empty);}note.textContent=data.partial?setupText('Įkelta dalis turinio. Gali atnaujinti arba ieškoti visame F1 TV.','Some content could not be loaded. Refresh or search all F1 TV.'):setupText('F1 pateikta atranka. Daugiau įrašų rasi paieškoje arba atvėręs kolekciją.','A selection from F1. Find more in Search or open a collection.');}
+    function load(force){refresh.disabled=true;var saved=editorialCache[group],loading;if(saved)paint(saved);else if(!host.firstChild)loading=editorialLoading(host,false);getEditorial(group,force).then(function(data){if(!active())return;refresh.disabled=false;paint(data);if(force)refresh.focus();},function(e){if(!active())return;refresh.disabled=false;var old=host.querySelector('.catalog-loading');if(old)old.remove();var stale=editorialCache[group];if(stale)paint(stale);else host.textContent='';error(host,e.message,function(){load(true);});});}load(false);
+  }
+  function renderHomeEditorial(main){var view=current,section=node('section','','home-section editorial-home'),heading=node('div','','section-heading');heading.appendChild(node('h2',setupText('Apžvalgos','Highlights')));heading.appendChild(focusKey(button(setupText('Apžvalgos ir laidos ›','Highlights & shows ›'),function(){openEditorial('highlights');},'section-more'),'home-editorial-all'));section.appendChild(heading);var host=node('div','','editorial-home-results');section.appendChild(host);main.appendChild(section);
+    function active(){return current===view&&!playing&&document.contains(section);}
+    function paint(data){if(!active()||host.contains(document.activeElement))return;host.textContent='';var cards=node('div','','tiles');data.items.slice(0,4).forEach(function(i){cards.appendChild(itemCard(i,'home-highlight-'+i.id));});if(data.items.length)host.appendChild(cards);else host.appendChild(node('p',setupText('Apžvalgas ir laidas rasi atvėręs skiltį.','Open Highlights & shows to browse more.'),'settings-note'));}
+    var saved=editorialCache.highlights;if(saved)paint(saved);else editorialLoading(host,true);getEditorial('highlights',false).then(paint,function(){if(!active())return;host.textContent='';host.appendChild(node('p',setupText('Apžvalgų įkelti nepavyko. Atverk skiltį ir bandyk dar kartą.','Highlights could not load. Open the section to retry.'),'settings-note'));});
+  }
+
   function renderVideoDetails(main,item) {
     var entry=localStore.get(item.id),position=UX.resume(entry),box=node('section','','video-detail');
     var art=node('div','','detail-art'); if(/singapore/i.test(item.title))paintArtwork(art,'card-art',false);else graphicArtwork(art,item.live?'live':'collection','F1');imageArtwork(art,item.image,true); box.appendChild(art);
@@ -5319,8 +5404,8 @@ window.ApexProtectionProbe = {
     var wrap=node('section','','catalog-content'),tools=node('div','','catalog-tools');
     var searchBox=node('div','','catalog-search'),label=node('label','Paieška šiame kataloge');label.htmlFor='catalog-query';var input=focusKey(node('input'),'catalog-query');input.id='catalog-query';input.type='search';input.maxLength=80;input.value=current.query||'';I18n.attr(input, 'placeholder', 'Pavadinimas, GP ar sesija');input.autocomplete='off';
     searchBox.appendChild(label);searchBox.appendChild(input);tools.appendChild(searchBox);
-    var filterLabels={all:'Visos sesijos',race:'Lenktynės',qualifying:'Kvalifikacija',sprint:'Sprintas',practice:'Treniruotės',highlights:'Svarbiausi momentai',kids:'F1 Kids'},sortLabels={default:'F1 tvarka',title:'Pagal pavadinimą',year:'Naujausi sezonai',duration:'Ilgiausi įrašai'};
-    var filter=focusKey(button(filterLabels[current.filter||'all'],function(){dialog('Sesijų filtras','Pasirink, ką rodyti atidarytame kataloge.',Object.keys(filterLabels).map(function(k){return{label:filterLabels[k],default:k===(current.filter||'all'),run:function(){current.filter=k;current.offset=0;paintResults();I18n.setText(filter, filterLabels[k]);filter.focus();}};}));},'secondary-button'),'catalog-filter');filter.setAttribute('aria-haspopup','dialog');if(items.some(function(i){return i.kind==='video';}))tools.appendChild(filter);
+    var filterLabels={all:'Visos sesijos',race:'Lenktynės',qualifying:'Kvalifikacija',sprint:'Sprintas',practice:'Treniruotės',highlights:'Svarbiausi momentai',race30:'Race in 30',kids:'F1 Kids'},sortLabels={default:'F1 tvarka',title:'Pagal pavadinimą',year:'Naujausi sezonai',duration:'Ilgiausi įrašai'};
+    var filter=focusKey(button(filterLabels[current.filter||'all'],function(){dialog('Sesijų filtras','Pasirink, ką rodyti atidarytame kataloge.',Object.keys(filterLabels).map(function(k){return{label:filterLabels[k],default:k===(current.filter||'all'),run:function(){current.filter=k;current.offset=0;paintResults();I18n.setText(filter, filterLabels[k]);filter.focus();}};}));},'secondary-button'),'catalog-filter');filter.setAttribute('aria-haspopup','dialog');if(current.tab!=='editorial'&&items.some(function(i){return i.kind==='video';}))tools.appendChild(filter);
     var sort=focusKey(button(sortLabels[current.sort||'default'],function(){dialog('Rikiavimas','Rikiuojamas tik šis katalogas.',Object.keys(sortLabels).map(function(k){return{label:sortLabels[k],default:k===(current.sort||'default'),run:function(){current.sort=k;current.offset=0;paintResults();I18n.setText(sort, sortLabels[k]);sort.focus();}};}));},'secondary-button'),'catalog-sort');sort.setAttribute('aria-haspopup','dialog');tools.appendChild(sort);
     var clear=focusKey(button('Išvalyti',function(){current.query='';current.filter='all';current.offset=0;input.value='';I18n.setText(filter, filterLabels.all);paintResults();input.focus();},'secondary-button'),'catalog-clear');tools.appendChild(clear);
     if(current.tab==='live')tools.appendChild(focusKey(button('Atnaujinti',function(){refreshLive(true);},'secondary-button'),'catalog-refresh'));
@@ -5368,8 +5453,7 @@ window.ApexProtectionProbe = {
       card.appendChild(node('p',setupText('TV: ','TV: ')+(runtime.model||setupText('modelis nepasiekiamas','model unavailable'))+' · Apex TV '+runtime.version,'settings-note'));
       setupButton(actions,'Pradėti','Get started',function(){setupPhase('account');},'setup-start',true).setAttribute('data-default-focus','true');
     }else if(phase==='account'){
-      card.appendChild(node('h2',setupText('1. Prisijunk prie F1 TV','1. Sign in to F1 TV')));
-      card.appendChild(node('p',setupText('Naudok savo F1 TV paskyrą. Prisijungimas vyksta tiesiogiai televizoriuje.','Use your own F1 TV account. Sign-in runs directly on the TV.')));
+      card.classList.add('setup-login');
       renderTVAccount(card);
       if(account&&account.signedIn)setupButton(actions,'Toliau: vaizdo patikra','Next: playback check',function(){setupPhase('video');},'setup-account-next',true).setAttribute('data-default-focus','true');
       setupButton(actions,'← Ankstesnis žingsnis','← Previous step',function(){setupPhase('welcome');},'setup-account-back');
@@ -5481,6 +5565,7 @@ window.ApexProtectionProbe = {
     else if(current.tab==='setup')renderSetup(main);
     else if(current.tab==='compatibility')renderCompatibility(main);
     else if(current.tab==='weekend'&&account&&account.signedIn)renderWeekend(main);
+    else if(current.tab==='editorial'&&!current.page&&!current.detail&&account&&account.signedIn)renderEditorial(main);
     else if(current.tab==='search'&&!current.page&&!current.detail&&account&&account.signedIn)renderGlobalSearch(main);
     else if(current.tab==='saved'||current.tab==='history')renderItems(main,localStore.state()[current.tab==='saved'?'favorites':'progress']);
     else if(!account||!account.signedIn){var empty=node('section','','empty-state');empty.appendChild(node('h2','Prisijunk prie F1 TV'));empty.appendChild(node('p','Įrašams ir transliacijoms reikia tavo F1 paskyros.'));var signin=focusKey(button('Prisijungti',function(){showTab('settings','Nustatymai');},'primary-button'),'catalog-signin');empty.appendChild(signin);main.appendChild(empty);}
@@ -5499,21 +5584,24 @@ window.ApexProtectionProbe = {
     if (account && account.signedIn) {
       var summary = node('div', '', 'account-summary'), copy = node('div'); copy.appendChild(node('h2', 'F1 TV paskyra'));
       copy.appendChild(node('p', 'Prisijungta · ' + account.country)); summary.appendChild(copy);
-      summary.appendChild(focusKey(button('Atsijungti', function () { dialog('Atsijungti nuo F1 TV?','Šiame TV bus pašalinta F1 sesija, žiūrėjimo istorija ir mėgstami įrašai.',[{label:'Atšaukti',default:true},{label:'Atsijungti',run:function(){window.ApexStandalone.signOut().then(function(){localStore.clearAccount();setupStore.clearAccount();setupCatalogue={status:"untested"};catalogueCache.clear();driverStore.clear();weekendData=null;preferredAudioLanguage="";try{localStorage.removeItem("apex-audio-language");}catch(_){}stack=[];refreshAccount();}).catch(function(e){error(root.querySelector('main'),e.message);});}}]); }, 'secondary-button'), 'account-signout')); box.appendChild(summary);
+      summary.appendChild(focusKey(button('Atsijungti', function () { dialog('Atsijungti nuo F1 TV?','Šiame TV bus pašalinta F1 sesija, žiūrėjimo istorija ir mėgstami įrašai.',[{label:'Atšaukti',default:true},{label:'Atsijungti',run:function(){window.ApexStandalone.signOut().then(function(){localStore.clearAccount();setupStore.clearAccount();setupCatalogue={status:"untested"};catalogueCache.clear();editorialCache={};editorialPending={};driverStore.clear();weekendData=null;preferredAudioLanguage="";try{localStorage.removeItem("apex-audio-language");}catch(_){}stack=[];refreshAccount();}).catch(function(e){error(root.querySelector('main'),e.message);});}}]); }, 'secondary-button'), 'account-signout')); box.appendChild(summary);
     } else {
-      box.appendChild(node('h2', 'Prisijunk prie F1 TV')); box.appendChild(node('p', 'Duomenys siunčiami tiesiai F1. Slaptažodis neišsaugomas.'));
-      var form = node('form'), email = node('input'), password = node('input'), message = node('p');
+      box.classList.add('login-panel');
+      var mark=node('div','F1','login-mark');mark.setAttribute('aria-hidden','true');box.appendChild(mark);
+      var heading=node('h2',setupText('Prisijunk prie F1 TV','Sign in to F1 TV'),'login-title');heading.id='login-heading';box.setAttribute('aria-labelledby',heading.id);box.appendChild(heading);
+      box.appendChild(node('p',setupText('Naudok savo F1 TV paskyrą.','Use your F1 TV account.'),'login-description'));
+      var form = node('form','','login-form'), email = node('input'), password = node('input'), message = node('p','','login-message');
       email.id = 'f1-email'; email.type = 'email'; I18n.attr(email, 'placeholder', 'vardas@pastas.lt'); email.autocomplete = 'username'; email.maxLength = 254; focusKey(email, 'account-email'); email.setAttribute('data-default-focus', 'true');
       password.id = 'f1-password'; password.type = 'password'; I18n.attr(password, 'placeholder', 'F1 paskyros slaptažodis'); password.autocomplete = 'current-password'; password.maxLength = 512; focusKey(password, 'account-password');
       var emailLabel = node('label', 'El. paštas'); emailLabel.htmlFor = email.id; var passwordLabel = node('label', 'Slaptažodis'); passwordLabel.htmlFor = password.id;
-      var submit = focusKey(button('Prisijungti', function () {}, 'primary-button'), 'account-login'); submit.type = 'submit'; message.setAttribute('role', 'status');
-      form.appendChild(emailLabel); form.appendChild(email); form.appendChild(passwordLabel); form.appendChild(password); form.appendChild(submit); form.appendChild(message);
+      var submit = focusKey(button('Prisijungti', function () {}, 'primary-button'), 'account-login'); submit.type = 'submit'; message.setAttribute('role', 'status');message.setAttribute('aria-live','polite');message.id='f1-login-message';
+      var emailField=node('div','','login-field'),passwordField=node('div','','login-field');emailField.appendChild(emailLabel);emailField.appendChild(email);passwordField.appendChild(passwordLabel);passwordField.appendChild(password);form.appendChild(emailField);form.appendChild(passwordField);form.appendChild(submit);form.appendChild(message);
       form.onsubmit = function (event) {
         event.preventDefault(); if (submit.disabled) return;
-        var secret = password.value; password.value = ''; submit.disabled = true; I18n.setText(message, 'Jungiamasi prie F1…');
-        window.ApexStandalone.login(email.value.trim(), secret).then(function () { secret = ''; refreshAccount(); }, function (e) { secret = ''; submit.disabled = false; I18n.setText(message, e.message || 'Prisijungti nepavyko.'); password.focus(); });
+        var secret = password.value; password.value = ''; submit.disabled = true; message.setAttribute('data-state','pending'); I18n.setText(message, 'Jungiamasi prie F1…');
+        window.ApexStandalone.login(email.value.trim(), secret).then(function () { secret = ''; refreshAccount(); }, function (e) { secret = ''; submit.disabled = false; message.setAttribute('data-state','error'); I18n.setText(message, e.message || 'Prisijungti nepavyko.'); password.focus(); });
       };
-      box.appendChild(form);
+      box.appendChild(form);box.appendChild(node('p',setupText('Prisijungimas tiesiai į F1. Slaptažodžio neišsaugome.','Sign in directly with F1. Your password is not saved.'),'login-privacy'));
     }
     main.appendChild(box);
   }

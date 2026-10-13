@@ -28,7 +28,7 @@ test('TV browser client rejects forged account tokens before requesting entitlem
   const jwk={...rsa.publicKey.export({format:'jwk'}),kid:'test'},requests=[];
   const context={window:{},crypto:crypto.webcrypto,TextEncoder,TextDecoder,Uint8Array,AbortController,URL,Promise,setTimeout,clearTimeout,atob,btoa,
     fetch:async(url)=>{requests.push(url);return new Response(JSON.stringify({keys:[jwk]}),{headers:{'Content-Type':'application/json'}});}};
-  vm.createContext(context);vm.runInContext(await fs.readFile(new URL('../web/discovery.js',import.meta.url),'utf8'),context);vm.runInContext(await fs.readFile(new URL('../web/f1-browser.js',import.meta.url),'utf8'),context);
+  vm.createContext(context);vm.runInContext(await fs.readFile(new URL('../web/discovery.js',import.meta.url),'utf8'),context);vm.runInContext(await fs.readFile(new URL('../web/editorial.js',import.meta.url),'utf8'),context);vm.runInContext(await fs.readFile(new URL('../web/f1-browser.js',import.meta.url),'utf8'),context);
   const header=Buffer.from(JSON.stringify({alg:'RS256',kid:'test'})).toString('base64url');
   const payload=Buffer.from(JSON.stringify({exp:Date.now()/1000+3600})).toString('base64url');
   await assert.rejects(context.window.ApexStandalone.client.signIn(header+'.'+payload+'.'+Buffer.from('forged').toString('base64url')));

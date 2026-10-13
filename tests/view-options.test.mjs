@@ -63,7 +63,7 @@ test('camera choices discard malformed and duplicate service identifiers and rem
 async function standalone(){
   const indexedDB={open(){const q={result:{transaction(){return {objectStore(){return {get(){const value={result:undefined};setTimeout(()=>value.onsuccess(),0);return value;}};}};}}};setTimeout(()=>q.onsuccess(),0);return q;}};
   const context={window:{APEX_CONTEXT:{revision:'test'}},indexedDB,fetch:async()=>{throw Error("Unexpected network in test");},crypto:crypto.webcrypto,URL,Promise,TextEncoder,TextDecoder,Uint8Array,AbortController,setTimeout,clearTimeout,atob,btoa};vm.createContext(context);
-  vm.runInContext(await fs.readFile(new URL('../web/view-options.js',import.meta.url),'utf8'),context);vm.runInContext(await fs.readFile(new URL('../web/discovery.js',import.meta.url),'utf8'),context);vm.runInContext(await fs.readFile(new URL('../web/f1-browser.js',import.meta.url),'utf8'),context);
+  vm.runInContext(await fs.readFile(new URL('../web/view-options.js',import.meta.url),'utf8'),context);vm.runInContext(await fs.readFile(new URL('../web/discovery.js',import.meta.url),'utf8'),context);vm.runInContext(await fs.readFile(new URL('../web/editorial.js',import.meta.url),'utf8'),context);vm.runInContext(await fs.readFile(new URL('../web/f1-browser.js',import.meta.url),'utf8'),context);
   const direct=context.window.ApexStandalone;direct.client.json=async()=>({});return direct;
 }
 test('standalone routes forward the selected camera and bind the unchanged licence challenge to its ticket',async()=>{

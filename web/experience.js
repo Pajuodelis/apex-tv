@@ -63,6 +63,7 @@
   function category(raw) {
     var name = fold(raw.title);
     if (/\bkids\b/.test(name)) return 'kids';
+    if (/\brace\s+in\s+30\b/.test(name)) return 'race30';
     if (/highlights|svarbiausi|momentai/.test(name)) return 'highlights';
     if (/practice|treniruot/.test(name)) return 'practice';
     if (/sprint/.test(name)) return 'sprint';
