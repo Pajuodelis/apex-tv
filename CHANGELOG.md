@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.5.10 — 2026-10-14
+
+- Fix highlights playback when a static DASH manifest splits inherited timing and media paths between parent and representation SegmentTemplate elements. The existing XML adapter now merges these scopes before local routing.
+- Regression tests cover inherited timescales, representation overrides, padded segment numbers, preserved protection metadata, missing assets and rejected media hosts.
+- Physical Samsung UE55AU7092 / Tizen 6 validation: official phone QR sign-in, F1 subscription and region checks, saved session after app restart, and Qualifying Highlights – Singapore with picture and sound confirmed.
+- Newer Chromium 120 engine checks passed for QR UI, encrypted storage and real F1 device-code/pending requests. A physical Tizen 9 confirmation is still needed.
+
 ## 0.5.9 — 2026-10-14
 
 - Sign in with your phone: scan the TV's QR, sign in on the official F1 page and approve the displayed code. No computer or Apex account relay is required for this flow.

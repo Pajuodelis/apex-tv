@@ -18,8 +18,10 @@ signature**, **subscription**, **region**, and **storage**. They omit credential
 and codes. F1's own account, region and subscription restrictions still apply.
 
 Phone approval plus F1 signature, entitlement and LT region were verified
-against the real service on 2026-10-14. This does not establish physical-TV
-QR, sign-in, persistence and playback compatibility on every Tizen model.
+against the real service on 2026-10-14. Phone QR sign-in, saved-session reuse
+after app restart and F1 highlights picture/sound were also confirmed on a
+physical Samsung UE55AU7092 / Tizen 6. This does not establish physical-TV
+compatibility on every Tizen model; Tizen 9 still needs its own confirmation.
 
 The TV's direct sign-in uses F1's password API. F1 can reject that request,
 including with HTTP 403. This does not by itself indicate a leaked password.

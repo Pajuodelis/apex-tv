@@ -4922,7 +4922,10 @@ function buildLegacy(stream,base) {
 }
 function build(stream,base) {
   var xml=stream.manifestXML;
-  if(typeof xml==='string'&&(/<MPD\b[^>]*\btype\s*=\s*["']dynamic["']|<BaseURL[\s>]/i.test(xml)||(xml.match(/<Period\b/g)||[]).length>1)){
+  // Static highlights can inherit timing at AdaptationSet level while each
+  // Representation supplies media/initialization. Merge scopes before rewriting.
+  var inherited=typeof xml==='string'&&((xml.match(/<SegmentTemplate\b[^>]*>/g)||[]).some(function(tag){return !attr(tag,'initialization')||!attr(tag,'media');})||/<SegmentTemplate\b/.test(xml.replace(/<AdaptationSet\b[^>]*>[\s\S]*?<\/AdaptationSet>/g,'')));
+  if(typeof xml==='string'&&(inherited||/<MPD\b[^>]*\btype\s*=\s*["']dynamic["']|<BaseURL[\s>]/i.test(xml)||(xml.match(/<Period\b/g)||[]).length>1)){
     if(!global.ApexDashManifest)throw Error('TV gyvo DASH aprašo modulis neįkeltas.');
     return global.ApexDashManifest.build(stream,base);
   }
