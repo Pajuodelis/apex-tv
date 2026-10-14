@@ -20,6 +20,18 @@ companion on the local network; this is disabled in the public bootstrap.
 Do not publish local app-state directories, exported sessions, complete DRM
 responses, private certificates, or personal diagnostic bundles.
 
+## Official browser pairing
+
+The optional desktop companion opens F1's own HTTPS page in an isolated,
+sandboxed browser window. It observes only the F1 login-session cookie from an HTTPS F1 page
+needed to verify the session; it does not type or store the password.
+The TV pairing code is private: it contains an expiring, single-use local
+authorization key and the companion's public signing key, not the F1 token.
+Only the configured TV can redeem it. Session transport uses an ECDH/AES-GCM
+encrypted envelope and an RSA signature. The TV verifies F1 independently.
+Neither pairing secrets nor token values appear in login diagnostics.
+The TV's pinned public update key is not replaced by a pairing key.
+
 ## Local compatibility reports
 
 The first-run guide stores its phase and human picture/sound confirmations on

@@ -6,7 +6,7 @@ import { root, stateDir } from '../companion/paths.mjs';
 export async function setup({ writeConnection = true, stateDirectory = stateDir } = {}) {
   await fs.mkdir(stateDirectory, { recursive: true });
   let configText;
-  try { configText = await fs.readFile(path.join(root, 'companion/config.json'), 'utf8'); }
+  try { configText = await fs.readFile(process.env.APEX_COMPANION_CONFIG || path.join(root, 'companion/config.json'), 'utf8'); }
   catch (error) { if (error.code !== 'ENOENT') throw error; configText = await fs.readFile(path.join(root, 'companion/config.example.json'), 'utf8'); }
   const config = JSON.parse(configText);
   function localAddress(address) {

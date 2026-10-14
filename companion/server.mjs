@@ -28,6 +28,7 @@ export async function createApp({ setupData, client = new F1Client(), actions = 
   const releases = new Releases(root, privateKey), discovery = Discovery.create(client), editorial = Editorial.create(client);
   await releases.publish();
   const streams = new Map(), diagnostics = [];
+  let officialPairing = null;
   let tvCommand = null, tvPlaybackPreference = null;
   const csrf = crypto.randomBytes(24).toString('hex');
   const hostnames = new Set(['127.0.0.1:' + config.port, 'localhost:' + config.port, config.pcAddress + ':' + config.port]);
@@ -81,7 +82,16 @@ export async function createApp({ setupData, client = new F1Client(), actions = 
         if (url.pathname === '/admin.css' && req.method === 'GET') {
           res.writeHead(200, { 'Content-Type': 'text/css; charset=utf-8' }); res.end(await fs.readFile(path.join(root, 'web/admin.css'))); return;
         }
-        if (url.pathname === '/admin/state' && req.method === 'GET') return send({ csrf, account: client.status(), config, revision: releases.current.revision, diagnostics: diagnostics.slice(-30), playback: client.playbackInfo, license: client.licenceInfo, transport: client.transportInfo });
+        if (url.pathname === '/admin/state' && req.method === 'GET') return send({ csrf, account: client.status(), config, revision: releases.current.revision, diagnostics: diagnostics.slice(-30), playback: client.playbackInfo, license: client.licenceInfo, transport: client.transportInfo, officialLogin: client.officialLoginInfo });
+        if (url.pathname === '/admin/pairing-code' && req.method === 'POST') {
+          if (!client.status().signedIn) throw new ServiceError('Pirmiausia prisijunk oficialiame F1 lange.', 401);
+          if (config.pcAddress === '127.0.0.1' || config.tvAddress === '127.0.0.1')
+            throw new ServiceError('companion/config.json nurodyk tikrus kompiuterio ir TV vietinius adresus.', 400);
+          res.setHeader('Cache-Control', 'no-store');
+          officialPairing = { key: crypto.randomBytes(32).toString('hex'), expires: Date.now() + 5 * 60 * 1000 };
+          return send({ version: 1, server: 'http://' + config.pcAddress + ':' + config.port,
+            key: officialPairing.key, publicKey, expires: officialPairing.expires });
+        }
         if (url.pathname === '/admin/login' && req.method === 'POST') { if (!actions.login) throw new ServiceError('Paleisk programėlę su npm start, kad atsidarytų F1 langas.', 503); await actions.login(); return send({ ok: true }); }
         if (url.pathname === '/admin/logout' && req.method === 'POST') { await client.signOut(); editorial.clear(); discovery.clear(); streams.clear(); tvCommand = null; tvPlaybackPreference = null; await actions.logout?.(); return send({ ok: true }); }
         if (url.pathname === '/admin/restart' && req.method === 'POST') {
@@ -167,6 +177,18 @@ export async function createApp({ setupData, client = new F1Client(), actions = 
         const headers = { 'Content-Type': asset.slot.type + '/mp4', 'Accept-Ranges': 'bytes', 'Content-Length': range.end - range.start + 1 };
         if (range.status === 206) headers['Content-Range'] = 'bytes ' + range.start + '-' + range.end + '/' + bytes.length;
         res.writeHead(range.status, headers); res.end(req.method === 'HEAD' ? undefined : bytes.subarray(range.start, range.end + 1)); return;
+      }
+      if (url.pathname === '/api/official-tv-session' && req.method === 'POST') {
+        if (local || ip !== config.tvAddress) throw new ServiceError('Sesija skirta tik susietam televizoriui.', 403);
+        if (!officialPairing || officialPairing.expires < Date.now() ||
+            !sameSecret(req.headers['x-apex-key'], officialPairing.key))
+          throw new ServiceError('TV susiejimo kodas pasibaigė arba netinkamas.', 401);
+        if (!client.status().signedIn) throw new ServiceError('Pirmiausia prisijunk oficialiame F1 lange.', 401);
+        let data; try { data = JSON.parse(await body(req, 4096)); } catch { throw new ServiceError('Netinkama TV sesijos užklausa.', 400); }
+        if (!data || Object.keys(data).some(key => key !== 'publicKey')) throw new ServiceError('Netinkama TV sesijos užklausa.', 400);
+        const envelope = await sealTVSession(client.token, data.publicKey, privateKey);
+        officialPairing = null;
+        return send(envelope);
       }
       if (!sameSecret(req.headers['x-apex-key'], pairingKey)) throw new ServiceError('TV ryšio raktas netinkamas.', 401);
       if (url.pathname === '/api/tv-command' && req.method === 'GET') {

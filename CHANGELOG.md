@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.5.8 — 2026-10-14
+
+- Sign-in diagnostics identify authentication, signature, subscription, region and storage failures instead of showing the same generic HTTP 403 at every step. Reports contain no account credentials, tokens or response bodies.
+- Official F1 browser fallback: sign in in the desktop companion and link its signed, encrypted session to the configured TV using a five-minute, single-use pairing code. The TV independently verifies F1's session, subscription and region.
+- Recognize F1 login-session cookies without a Secure attribute when obtained from the isolated HTTPS F1 window; F1 signature validation remains required. Existing session cookies are checked after navigation, including cookies with API/path-specific scope.
+- The fallback requires a computer for pairing or signing in again, but not for subsequent TV playback. The TV's public update key and app ID are unchanged.
+- Validation: 220 tests passed; official desktop sign-in completed, region LT was verified and the F1 window closed automatically. Samsung GU55U8079FUXZG / Tizen 9 pairing and playback still need physical confirmation.
+
 ## 0.5.7 — 2026-10-13
 
 - New Highlights & shows section: highlights, Race in 30, official F1 shows and documentaries, including recent GP selections.

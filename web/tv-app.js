@@ -779,6 +779,23 @@ window.ApexProtectionProbe = {
         window.ApexStandalone.login(email.value.trim(), secret).then(function () { secret = ''; refreshAccount(); }, function (e) { secret = ''; submit.disabled = false; message.setAttribute('data-state','error'); I18n.setText(message, e.message || 'Prisijungti nepavyko.'); password.focus(); });
       };
       box.appendChild(form);box.appendChild(node('p',setupText('Prisijungimas tiesiai į F1. Slaptažodžio neišsaugome.','Sign in directly with F1. Your password is not saved.'),'login-privacy'));
+      var diagnostics=node('pre','','login-diagnostics'); diagnostics.hidden=true;
+      function showLoginDiagnostics(){diagnostics.textContent=JSON.stringify(window.ApexStandalone.loginDiagnostics(),null,2);diagnostics.hidden=false;}
+      box.appendChild(focusKey(button(setupText('Rodyti prisijungimo diagnostiką','Show sign-in diagnostics'),showLoginDiagnostics,'secondary-button'),'account-login-diagnostics'));
+      box.appendChild(diagnostics);
+      var official=node('section','','official-login');official.hidden=true;
+      box.appendChild(focusKey(button(setupText('Prisijungimas per oficialų F1 langą','Sign in through the official F1 window'),function(){official.hidden=!official.hidden;if(!official.hidden)pairing.focus();},'secondary-button'),'account-official-options'));
+      official.appendChild(node('h3',setupText('Oficialus F1 prisijungimas','Official F1 sign-in')));
+      official.appendChild(node('p',setupText('Jei F1 atmeta tiesioginį prisijungimą: kompiuteryje paleisk Apex TV companion, prisijunk oficialiame F1 lange ir sukurk TV susiejimo kodą. Įklijuok jį čia. Kompiuterio reikia tik susiejimui arba pakartotiniam prisijungimui.','If F1 rejects direct sign-in: run the Apex TV companion on a computer, sign in in the official F1 window, and create a TV pairing code. Paste it here. The computer is needed only for pairing or signing in again.')));
+      var pairing=node('textarea');pairing.maxLength=4096;pairing.rows=3;pairing.autocomplete='off';pairing.spellcheck=false;pairing.setAttribute('autocapitalize','off');
+      pairing.setAttribute('aria-label',setupText('Privatus TV susiejimo kodas','Private TV pairing code'));
+      pairing.setAttribute('placeholder',setupText('Įklijuok susiejimo kodą tik iš savo kompiuterio','Paste the pairing code only from your own computer'));
+      focusKey(pairing,'account-official-code');official.appendChild(pairing);
+      var pairButton=focusKey(button(setupText('Susieti oficialų prisijungimą','Link official sign-in'),function(){
+        if(pairButton.disabled)return;var code=pairing.value;pairing.value='';pairButton.disabled=true;
+        window.ApexStandalone.loginOfficial(code).then(function(){code='';refreshAccount();},function(e){code='';pairButton.disabled=false;message.setAttribute('data-state','error');I18n.setText(message,e.message);showLoginDiagnostics();pairing.focus();});
+      },'secondary-button'),'account-official-link');
+      official.appendChild(pairButton);box.appendChild(official);
     }
     main.appendChild(box);
   }

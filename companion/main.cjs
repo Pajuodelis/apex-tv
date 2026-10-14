@@ -2,6 +2,7 @@ const { app, BrowserWindow, Menu, session, safeStorage, dialog } = require('elec
 const fs = require('node:fs/promises');
 const path = require('node:path');
 const { pathToFileURL } = require('node:url');
+const { formulaHost, officialLoginUrl, sessionFromCookie, cookieObservation } = require('./official-login.cjs');
 const projectRoot = path.resolve(__dirname, '..');
 const stateDir = process.env.APEX_STATE_DIR || path.join(process.env.LOCALAPPDATA || app.getPath('appData'), 'Apex-TV-personal');
 app.setPath('userData', path.join(stateDir, 'electron-profile'));
@@ -14,12 +15,10 @@ app.on('second-instance', () => {
   if (dashboard.isMinimized()) dashboard.restore();
   dashboard.show(); dashboard.focus();
 });
-function formulaHost(raw) {
-  try { const u = new URL(raw); return u.protocol === 'https:' && (u.hostname === 'formula1.com' || u.hostname.endsWith('.formula1.com')); } catch { return false; }
-}
 async function openLogin() {
   if (loginWindow && !loginWindow.isDestroyed()) { loginWindow.focus(); return; }
   const loginSession = session.fromPartition('persist:apex-official-login');
+  instance.client.officialLoginInfo = { open: true, loaded: false, host: '' };
   loginWindow = new BrowserWindow({ width: 1000, height: 780, title: 'Prisijunk prie oficialaus F1 TV',
     webPreferences: { session: loginSession, nodeIntegration: false, contextIsolation: true, sandbox: true } });
   loginWindow.setMenuBarVisibility(false);
@@ -31,8 +30,9 @@ async function openLogin() {
   loginWindow.webContents.on('will-redirect', (event, url) => { if (!formulaHost(url)) event.preventDefault(); });
   const cookieChanged = async (_event, cookie, _cause, removed) => {
     if (removed || busy || cookie.name !== 'login-session' || !/^\.?([a-z0-9-]+\.)*formula1\.com$/i.test(cookie.domain)) return;
-    let value, token;
-    try { value = JSON.parse(decodeURIComponent(cookie.value)); token = value.data?.subscriptionToken || value.subscriptionToken; } catch { return; }
+    if (!loginWindow || loginWindow.isDestroyed() || !formulaHost(loginWindow.webContents.getURL())) return;
+    instance.client.officialLoginInfo.cookie = cookieObservation(cookie);
+    const token = sessionFromCookie(cookie);
     if (!token) return;
     busy = true;
     try {
@@ -44,10 +44,22 @@ async function openLogin() {
     } finally { busy = false; }
   };
   loginSession.cookies.on('changed', cookieChanged);
-  loginWindow.on('closed', () => { loginSession.cookies.removeListener('changed', cookieChanged); loginWindow = null; });
+  const existingSession = async () => {
+    if (!loginWindow || loginWindow.isDestroyed() || !formulaHost(loginWindow.webContents.getURL())) return;
+    const cookies = await loginSession.cookies.get({ name: 'login-session' });
+    if (!cookies.length) instance.client.officialLoginInfo.cookie = { found: false };
+    for (const cookie of cookies) await cookieChanged(null, cookie, 'existing', false);
+  };
+  loginWindow.webContents.on('did-finish-load', () => {
+    const url = loginWindow && !loginWindow.isDestroyed() ? loginWindow.webContents.getURL() : '';
+    instance.client.officialLoginInfo = { ...instance.client.officialLoginInfo, open: true, loaded: formulaHost(url), host: formulaHost(url) ? new URL(url).hostname : '' };
+    existingSession().catch(() => {});
+  });
+  loginWindow.on('closed', () => { loginSession.cookies.removeListener('changed', cookieChanged); loginWindow = null; busy = false; instance.client.officialLoginInfo = { open: false, loaded: false, host: '' }; });
   const cfg = instance.client.config;
-  const url = (cfg?.authLinks?.login || 'https://account.formula1.com/#/{lang}/login?redirect=').replace('{lang}', 'en') + encodeURIComponent('https://f1tv.formula1.com');
-  await loginWindow.loadURL(url); loginWindow.show(); loginWindow.focus();
+  const url = officialLoginUrl(cfg);
+  await loginWindow.loadURL(url);
+  if (loginWindow && !loginWindow.isDestroyed()) { loginWindow.show(); loginWindow.focus(); }
 }
 if (primaryInstance) app.whenReady().then(async () => {
   const { setup } = await import(pathToFileURL(path.join(projectRoot, 'tools/setup.mjs')).href);

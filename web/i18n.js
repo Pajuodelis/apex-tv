@@ -2,6 +2,16 @@
 (function(root,factory){var api=factory(root);if(typeof module==='object'&&module.exports)module.exports=api;else root.ApexI18n=api;}(typeof window!=='undefined'?window:globalThis,function(root){
   'use strict';
   var EN={
+  "F1 paskyros prisijungimas": "F1 account authentication",
+  "F1 sesijos parašas": "F1 session signature",
+  "F1 prenumeratos prieiga": "F1 subscription access",
+  "F1 regiono patikra": "F1 region check",
+  "TV sesijos išsaugojimas": "TV session storage",
+  "Oficialaus prisijungimo susiejimas": "Official sign-in pairing",
+  "patikra nepavyko": "check failed",
+  "Netinkamas susiejimo kodas.": "Invalid pairing code.",
+  "Netinkamas vietinio kompiuterio adresas.": "Invalid local computer address.",
+  "Susiejimo kodas pasibaigė. Kompiuteryje sukurk naują.": "Pairing code expired. Create a new one on the computer.",
   "Pavadinimas, GP ar sesija": "Title, GP or session",
   "Apžvalgos ir laidos": "Highlights & shows",
   "APŽVALGOS IR LAIDOS": "HIGHLIGHTS & SHOWS",

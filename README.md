@@ -108,6 +108,17 @@ Browser previews below use sample data. No real account details or race footage 
 
 ## Updates
 
+### Sign-in rejected with HTTP 403?
+
+Version 0.5.8 reports the exact failed sign-in step. Use **Show sign-in
+diagnostics** on the TV; the report excludes account credentials and tokens.
+An alternative uses the official F1 window in the optional desktop companion
+and a private, encrypted TV session handoff. A computer is needed for that
+pairing step or signing in again, but not for playback afterwards.
+See [sign-in instructions](docs/SIGN-IN.md). This does not override an F1
+account, subscription, region or anti-bot rejection. Tizen 9 still needs its
+own physical test.
+
 Menu and player updates arrive directly from the
 [public update feed](https://github.com/Pajuodelis/apex-tv/tree/main/updates)
 and apply when playback is idle. The TV checks their RSA signature, SHA-256

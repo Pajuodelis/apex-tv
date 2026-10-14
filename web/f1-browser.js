@@ -211,13 +211,13 @@
     }
     async signIn(token, persist = true) {
       var _a, _b, _c;
-      const payload = await this.verifyToken(token);
-      const entitlement = await this.json(ORIGIN + "/2.0/R/ENG/WEB_DASH/ALL/USER/ENTITLEMENT", { ascendontoken: token });
+      const payload = await loginStep("signature", () => this.verifyToken(token));
+      const entitlement = await loginStep("entitlement", () => this.json(ORIGIN + "/2.0/R/ENG/WEB_DASH/ALL/USER/ENTITLEMENT", { ascendontoken: token }));
       const ent = (_a = entitlement.resultObj) == null ? void 0 : _a.entitlementToken;
-      if (!ent) throw new ServiceError("F1 nepateik\u0117 paskyros prieigos.", 403);
-      const location = await this.json(ORIGIN + "/1.0/R/ENG/WEB_DASH/ALL/USER/LOCATION", { entitlementtoken: ent, ascendontoken: token });
+      if (!ent) await loginStep("entitlement", () => { throw new ServiceError("F1 nepateik\u0117 paskyros prieigos.", 403); });
+      const location = await loginStep("location", () => this.json(ORIGIN + "/1.0/R/ENG/WEB_DASH/ALL/USER/LOCATION", { entitlementtoken: ent, ascendontoken: token }));
       if (!((_c = (_b = location.resultObj) == null ? void 0 : _b.userLocation) == null ? void 0 : _c[0])) throw new ServiceError("F1 nepateik\u0117 paskyros regiono.");
-      if (persist && this.vault) await this.vault.save(token);
+      if (persist && this.vault) await loginStep("storage", () => this.vault.save(token));
       this.token = token;
       this.entitlement = ent;
       this.location = location.resultObj.userLocation[0];
@@ -492,10 +492,73 @@
     if (!response.ok) {
       var error = new ServiceError("F1 u\u017Eklausa atmesta (HTTP " + response.status + ").", response.status === 401 || response.status === 403 ? 403 : 502);
       error.upstreamStatus = response.status;
+      var type = (response.headers.get("content-type") || "").split(";")[0].toLowerCase();
+      error.responseKind = type === "text/html" ? "html" : /json/.test(type) ? "json" : "other";
       throw error;
     }
     return response;
   };
+  var loginTrace = [], loginMode = "";
+  var loginLabels = {
+    authentication: "F1 paskyros prisijungimas",
+    signature: "F1 sesijos parašas",
+    entitlement: "F1 prenumeratos prieiga",
+    location: "F1 regiono patikra",
+    storage: "TV sesijos išsaugojimas",
+    pairing: "Oficialaus prisijungimo susiejimas"
+  };
+  function resetLogin(mode) { loginTrace = []; loginMode = mode; }
+  async function loginStep(stage, run) {
+    var entry = { stage: stage, state: "pending", status: 0, responseKind: "" };
+    loginTrace.push(entry);
+    if (loginTrace.length > 8) loginTrace.shift();
+    try {
+      var value = await run();
+      entry.state = "ok";
+      return value;
+    } catch (error) {
+      entry.state = "failed";
+      var status = Number(error.upstreamStatus || error.status || 0);
+      entry.status = Number.isInteger(status) && status >= 100 && status <= 599 ? status : 0;
+      entry.responseKind = ["html", "json", "other"].indexOf(error.responseKind) >= 0 ? error.responseKind : "";
+      if (error.loginStage && error.loginStage !== stage) throw error;
+      error.loginStage = stage;
+      // Never copy upstream bodies, request headers, account identifiers or credentials.
+      error.message = loginLabels[stage] + ": " + (entry.status ? "HTTP " + entry.status : "patikra nepavyko") +
+        (entry.responseKind ? " (" + entry.responseKind.toUpperCase() + ")" : "") + ".";
+      throw error;
+    }
+  }
+  function loginDiagnostics() {
+    return { version: 1, mode: loginMode, steps: loginTrace.map(function (e) {
+      return { stage: e.stage, state: e.state, status: e.status, responseKind: e.responseKind };
+    }) };
+  }
+  function pairingConfig(raw) {
+    if (typeof raw !== "string" || raw.length > 4096) throw new Error("Netinkamas susiejimo kodas.");
+    var data;
+    try { data = JSON.parse(raw); } catch (_) { throw new Error("Netinkamas susiejimo kodas."); }
+    if (!data || data.version !== 1 || Object.keys(data).some(function (k) {
+      return ["version","server","key","publicKey","expires"].indexOf(k) < 0;
+    })) throw new Error("Netinkamas susiejimo kodas.");
+    var u;
+    try { u = new URL(data.server); } catch (_) { throw new Error("Netinkamas vietinio kompiuterio adresas."); }
+    var octets = u.hostname.split(".").map(Number);
+    var local = /^\d+\.\d+\.\d+\.\d+$/.test(u.hostname) &&
+      octets.every(function (n) { return n >= 0 && n <= 255; }) &&
+      (octets[0] === 10 || octets[0] === 192 && octets[1] === 168 ||
+       octets[0] === 172 && octets[1] >= 16 && octets[1] <= 31);
+    if (u.protocol !== "http:" || !local || u.username || u.password || u.search || u.hash ||
+        u.pathname !== "/" || !u.port || Number(u.port) < 1024) throw new Error("Netinkamas vietinio kompiuterio adresas.");
+    if (!/^[a-f0-9]{64}$/.test(data.key || "") || !data.publicKey ||
+        data.publicKey.kty !== "RSA" || data.publicKey.e !== "AQAB" ||
+        !/^[A-Za-z0-9_-]{342,1024}$/.test(data.publicKey.n || "") ||
+        Object.keys(data.publicKey).some(function(k){return ["kty","e","n"].indexOf(k)<0;}))
+      throw new Error("Netinkamas susiejimo kodas.");
+    if (!Number.isFinite(data.expires) || data.expires < Date.now() ||
+        data.expires > Date.now() + 11 * 60 * 1000) throw new Error("Susiejimo kodas pasibaigė. Kompiuteryje sukurk naują.");
+    return { server: u.origin, key: data.key, publicKey: data.publicKey, path: "/api/official-tv-session" };
+  }
   var database = null;
   function db() {
     if (!database) database = new Promise(function(resolve, reject) {
@@ -566,10 +629,13 @@
       xhr.setRequestHeader("X-Apex-Key", ctx.key);
       xhr.onload = function() {
         if (xhr.status !== 200) {
-          reject(new Error("TV sesijos susiejimas nepavyko (HTTP " + xhr.status + ")."));
+          var error = new ServiceError("TV sesijos susiejimas nepavyko.", xhr.status);
+          error.upstreamStatus = xhr.status;
+          reject(error);
           return;
         }
         try {
+          if (xhr.responseText.length > 128 * 1024) throw new Error("Susiejimo atsakymas per didelis.");
           resolve(JSON.parse(xhr.responseText));
         } catch (e) {
           reject(new Error("TV sesijos atsakymas netinkamas."));
@@ -583,9 +649,9 @@
   }
   async function provision(ctx) {
     var own = await crypto.subtle.generateKey({ name: "ECDH", namedCurve: "P-256" }, true, ["deriveBits"]);
-    var envelope = await companion(ctx, "/api/tv-session", { publicKey: await crypto.subtle.exportKey("jwk", own.publicKey) });
+    var envelope = await companion(ctx, ctx.path || "/api/tv-session", { publicKey: await crypto.subtle.exportKey("jwk", own.publicKey) });
     var raw = decode64(envelope.payload);
-    if (!await verifySignature(window.APEX_CONFIG.publicKey, raw, decode64(envelope.signature))) throw new Error("TV sesijos para\u0161as netinkamas.");
+    if (!await verifySignature(ctx.publicKey || window.APEX_CONFIG.publicKey, raw, decode64(envelope.signature))) throw new Error("TV sesijos para\u0161as netinkamas.");
     var data = JSON.parse(new TextDecoder().decode(raw));
     if (data.version !== 1) throw new Error("TV sesijos versija netinkama.");
     var sender = await crypto.subtle.importKey("jwk", data.publicKey, { name: "ECDH", namedCurve: "P-256" }, false, []);
@@ -642,11 +708,20 @@
   }
   async function login(email, password) {
     if (typeof email !== "string" || email.length > 254 || typeof password !== "string" || password.length > 512) throw new Error("Patikrink prisijungimo duomenis.");
-    var response = await client.request("https://api.formula1.com/v2/account/subscriber/authenticate/by-password", { method: "POST", headers: { apiKey: "fCUCjWrKPu9ylJwRAv8BpGLEgiAuThx7", "Content-Type": "application/json" }, body: JSON.stringify({ Login: email, Password: password, DistributionChannel: "d861e38f-05ea-4063-8776-a7e2b6d885a4" }) });
-    var data = await response.json(), token = data.data && data.data.subscriptionToken;
-    if (!token) throw new Error("F1 nepatvirtino prisijungimo.");
+    resetLogin("password");
+    var token = await loginStep("authentication", async function () {
+      var response = await client.request("https://api.formula1.com/v2/account/subscriber/authenticate/by-password", { method: "POST", headers: { apiKey: "fCUCjWrKPu9ylJwRAv8BpGLEgiAuThx7", "Content-Type": "application/json" }, body: JSON.stringify({ Login: email, Password: password, DistributionChannel: "d861e38f-05ea-4063-8776-a7e2b6d885a4" }) });
+      var data = await response.json(), next = data.data && data.data.subscriptionToken;
+      if (!next) throw new Error("F1 nepatvirtino prisijungimo.");
+      return next;
+    });
     await client.signIn(token);
     return client.status();
+  }
+  async function loginOfficial(raw) {
+    resetLogin("official-browser");
+    var ctx = pairingConfig(raw);
+    return loginStep("pairing", function () { return provision(ctx); });
   }
   function initialize() {
     if (!ready) ready = (async function() {
@@ -724,7 +799,7 @@
     return vaultGet("events").then(function(events) {
       return events || [];
     });
-  }, client, initialize, request, provision, refresh: refreshSession, login, signOut: function() {
+  }, client, initialize, request, provision, refresh: refreshSession, login, loginOfficial, loginDiagnostics, signOut: function() {
     editorial.clear(); discovery.clear();
     return client.signOut();
   } };

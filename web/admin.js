@@ -20,6 +20,12 @@ function action(id, fn) {
   });
 }
 action('login', () => api('/admin/login', 'POST'));
+action('pairing-code', async () => {
+  const data = await api('/admin/pairing-code', 'POST');
+  const field = el('pairing-value'); field.hidden = false; field.value = JSON.stringify(data);
+  field.focus(); field.select();
+  setTimeout(() => { field.value = ''; field.hidden = true; }, Math.max(0, data.expires - Date.now()));
+});
 action('logout', () => api('/admin/logout', 'POST'));
 action('restart', async () => { await api('/admin/restart', 'POST'); el('message').textContent = 'Apex TV perkraunama. Išsaugotas F1 prisijungimas bus atkurtas.'; });
 action('publish', async () => { await api('/admin/publish', 'POST'); el('message').textContent = 'Nauja meniu versija paruošta. Televizoriuje ji bus įkelta kitą kartą paleidžiant programėlę.'; });
