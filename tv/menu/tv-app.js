@@ -2352,6 +2352,8 @@ return{store:store,identity:identity,platform:platform,report:report,failureCode
   'use strict';
   var EN={
   "F1 paskyros prisijungimas": "F1 account authentication",
+  "F1 telefono kodo sukūrimas": "F1 phone code request",
+  "F1 telefono patvirtinimas": "F1 phone approval",
   "F1 sesijos parašas": "F1 session signature",
   "F1 prenumeratos prieiga": "F1 subscription access",
   "F1 regiono patikra": "F1 region check",
@@ -3812,7 +3814,9 @@ var api={mode:mode,select:select,fps:fps,label:label};if(typeof module!=='undefi
     entitlement: "F1 prenumeratos prieiga",
     location: "F1 regiono patikra",
     storage: "TV sesijos išsaugojimas",
-    pairing: "Oficialaus prisijungimo susiejimas"
+    pairing: "Oficialaus prisijungimo susiejimas",
+    device_code: "F1 telefono kodo sukūrimas",
+    device_token: "F1 telefono patvirtinimas"
   };
   function resetLogin(mode) { loginTrace = []; loginMode = mode; }
   async function loginStep(stage, run) {
@@ -3840,6 +3844,102 @@ var api={mode:mode,select:select,fps:fps,label:label};if(typeof module!=='undefi
     return { version: 1, mode: loginMode, steps: loginTrace.map(function (e) {
       return { stage: e.stage, state: e.state, status: e.status, responseKind: e.responseKind };
     }) };
+  }
+  // Public F1 TV OAuth device client. All traffic goes directly to F1;
+  // device and OAuth tokens live only in this closure, never in diagnostics.
+  var phonePairing = null;
+  var deviceClientId = "13c21153-f2f3-484b-a642-f2a2927e55de";
+  function cancelPhoneLogin() {
+    if (!phonePairing) return;
+    phonePairing.cancelled = true;
+    if (phonePairing.controller) phonePairing.controller.abort();
+    phonePairing.deviceCode = "";
+    phonePairing = null;
+  }
+  function requirePhonePairing(session) {
+    if (phonePairing !== session || session.cancelled) {
+      var cancelled = new Error("Susiejimas atšauktas."); cancelled.cancelled = true; throw cancelled;
+    }
+    if (Date.now() >= session.expires) { var expired = new Error("F1 kodas pasibaigė. Sukurk naują kodą."); expired.deviceError = "expired_token"; throw expired; }
+  }
+  async function deviceRequest(session, path, fields) {
+    var controller = new AbortController(); session.controller = controller;
+    var timer = setTimeout(function () { controller.abort(); }, 20000);
+    try {
+      var response = await fetch("https://id.formula1.com/as/" + path, {
+        method: "POST", redirect: "error", credentials: "omit", signal: controller.signal,
+        headers: { "Content-Type": "application/x-www-form-urlencoded", Accept: "application/json" },
+        body: Object.keys(fields).map(function (key) { return encodeURIComponent(key) + "=" + encodeURIComponent(fields[key]); }).join("&")
+      });
+      if (phonePairing !== session || session.cancelled) { var stopped = new Error("Susiejimas atšauktas."); stopped.cancelled = true; throw stopped; }
+      var type = (response.headers.get("content-type") || "").toLowerCase();
+      var text = await response.text(), data;
+      if (text.length > 128 * 1024) throw new Error("F1 susiejimo atsakymas per didelis.");
+      try { data = JSON.parse(text); } catch (_) { data = null; }
+      // Only documented waiting states are retryable; HTTP 403 is never retried.
+      if (response.status === 400 && data && (data.error === "authorization_pending" || data.error === "slow_down")) return { waiting: data.error };
+      if (!response.ok) {
+        var error = new ServiceError("F1 susiejimas atmestas.", response.status);
+        error.upstreamStatus = response.status;
+        error.responseKind = /html/.test(type) ? "html" : /json/.test(type) ? "json" : "other";
+        if (data && ["expired_token", "access_denied", "invalid_grant"].indexOf(data.error) >= 0) error.deviceError = data.error;
+        throw error;
+      }
+      if (!data || typeof data !== "object") throw new Error("F1 susiejimo atsakymas netinkamas.");
+      return data;
+    } finally { clearTimeout(timer); if (session.controller === controller) session.controller = null; }
+  }
+  async function startPhoneLogin() {
+    cancelPhoneLogin(); resetLogin("phone");
+    var session = { cancelled: false, deviceCode: "", expires: Date.now() + 600000, interval: 5000, nextPoll: 0, busy: false };
+    phonePairing = session;
+    try {
+      return await loginStep("device_code", async function () {
+        var data = await deviceRequest(session, "device_authorization", { client_id: deviceClientId, scope: "openid f1tv_groups" });
+        requirePhonePairing(session);
+        if (typeof data.device_code !== "string" || !data.device_code || data.device_code.length > 8192 || !/^[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(data.user_code) || !Number.isFinite(data.expires_in) || data.expires_in < 1 || data.expires_in > 1800) throw new Error("F1 nepateikė galiojančio TV kodo.");
+        var uri = new URL(data.verification_uri);
+        if (uri.protocol !== "https:" || uri.hostname !== "f1.com" || uri.pathname !== "/pair" || uri.port || uri.username || uri.password || uri.search || uri.hash) throw new Error("F1 susiejimo adresas netinkamas.");
+        session.deviceCode = data.device_code;
+        session.expires = Date.now() + data.expires_in * 1000;
+        session.interval = Math.max(5, Math.min(60, Number(data.interval) || 5)) * 1000;
+        session.nextPoll = Date.now() + session.interval;
+        // Construct the QR from the validated official URI and visible code only.
+        return { code: data.user_code, url: uri.href + "?user_code=" + encodeURIComponent(data.user_code), expires: session.expires, retryAfter: session.interval };
+      });
+    } catch (error) { if (phonePairing === session) cancelPhoneLogin(); throw error; }
+  }
+  async function pollPhoneLogin() {
+    var session = phonePairing;
+    if (!session) { var stopped = new Error("Susiejimas atšauktas."); stopped.cancelled = true; throw stopped; }
+    try {
+      requirePhonePairing(session);
+      if (session.busy || Date.now() < session.nextPoll) return { state: "waiting", retryAfter: Math.max(1000, session.nextPoll - Date.now()) };
+      session.busy = true;
+      return await loginStep("device_token", async function () {
+        var data = await deviceRequest(session, "token", { client_id: deviceClientId, grant_type: "urn:ietf:params:oauth:grant-type:device_code", device_code: session.deviceCode });
+        requirePhonePairing(session);
+        if (data.waiting) {
+          if (data.waiting === "slow_down") session.interval += 5000;
+          session.nextPoll = Date.now() + session.interval;
+          return { state: "waiting", retryAfter: session.interval };
+        }
+        var claims, parts = typeof data.access_token === "string" && data.access_token.length <= 64000 ? data.access_token.split(".") : [];
+        try { claims = JSON.parse(new TextDecoder().decode(decode64(parts[1]))); } catch (_) { throw new Error("F1 nepateikė prenumeratos sesijos."); }
+        // OAuth envelope is not an Ascendon token. Trust only the nested session
+        // after the existing independent RS256 + entitlement + region checks.
+        var token = claims.subscriptionToken;
+        if (typeof token !== "string" || !token || token.length > 32000) throw new Error("F1 nepateikė prenumeratos sesijos.");
+        var verified = new F1Client(); await verified.signIn(token, false);
+        requirePhonePairing(session);
+        await loginStep("storage", function () { return client.vault.save(token); });
+        client.token = verified.token; client.entitlement = verified.entitlement;
+        client.location = verified.location; client.expires = verified.expires; client.error = "";
+        cancelPhoneLogin();
+        return { state: "signedIn", account: client.status() };
+      });
+    } catch (error) { if (phonePairing === session) cancelPhoneLogin(); throw error; }
+    finally { session.busy = false; }
   }
   function pairingConfig(raw) {
     if (typeof raw !== "string" || raw.length > 4096) throw new Error("Netinkamas susiejimo kodas.");
@@ -4106,7 +4206,8 @@ var api={mode:mode,select:select,fps:fps,label:label};if(typeof module!=='undefi
     return vaultGet("events").then(function(events) {
       return events || [];
     });
-  }, client, initialize, request, provision, refresh: refreshSession, login, loginOfficial, loginDiagnostics, signOut: function() {
+  }, client, initialize, request, provision, refresh: refreshSession, login, loginOfficial, loginDiagnostics, startPhoneLogin, pollPhoneLogin, cancelPhoneLogin, signOut: function() {
+    cancelPhoneLogin();
     editorial.clear(); discovery.clear();
     return client.signOut();
   } };
@@ -5641,7 +5742,10 @@ window.ApexProtectionProbe = {
     var technical = focusKey(button('Techninė informacija', function () { info.hidden = !info.hidden; technical.setAttribute('aria-expanded', String(!info.hidden)); }, 'secondary-button info-toggle'), 'settings-info');
     technical.setAttribute('aria-controls', info.id); technical.setAttribute('aria-expanded', 'false'); main.appendChild(technical); main.appendChild(info);
   }
+  var phoneLoginCleanup = null;
+  function cancelPhoneScreen() { if (phoneLoginCleanup) phoneLoginCleanup(); phoneLoginCleanup = null; }
   function render() {
+    cancelPhoneScreen();
     if(modal)closeModal();clearTimeout(searchTimer);clearInterval(liveTimer);applyPreferences();
     rememberView();var pending=++pendingRequest,main=layout();awaitingCatalogFocus=null;
     if(current.video)renderVideoDetails(main,current.video);
@@ -5674,25 +5778,55 @@ window.ApexProtectionProbe = {
       box.classList.add('login-panel');
       var mark=node('div','F1','login-mark');mark.setAttribute('aria-hidden','true');box.appendChild(mark);
       var heading=node('h2',setupText('Prisijunk prie F1 TV','Sign in to F1 TV'),'login-title');heading.id='login-heading';box.setAttribute('aria-labelledby',heading.id);box.appendChild(heading);
-      box.appendChild(node('p',setupText('Naudok savo F1 TV paskyrą.','Use your F1 TV account.'),'login-description'));
+      box.appendChild(node('p',setupText('Prisijunk telefonu per oficialų F1 puslapį.','Use your phone to sign in on the official F1 website.'),'login-description'));
+      var phoneHost=node('section','','phone-login'),phonePanel=node('div','','phone-pairing');phonePanel.hidden=true;
+      var phoneStart=focusKey(button(setupText('Prisijungti telefonu','Sign in with your phone'),startPhoneScreen,'primary-button'),'account-phone-login');phoneStart.setAttribute('data-default-focus','true');
+      phoneHost.appendChild(phoneStart);phoneHost.appendChild(phonePanel);box.appendChild(phoneHost);
       var form = node('form','','login-form'), email = node('input'), password = node('input'), message = node('p','','login-message');
-      email.id = 'f1-email'; email.type = 'email'; I18n.attr(email, 'placeholder', 'vardas@pastas.lt'); email.autocomplete = 'username'; email.maxLength = 254; focusKey(email, 'account-email'); email.setAttribute('data-default-focus', 'true');
+      email.id = 'f1-email'; email.type = 'email'; I18n.attr(email, 'placeholder', 'vardas@pastas.lt'); email.autocomplete = 'username'; email.maxLength = 254; focusKey(email, 'account-email');
       password.id = 'f1-password'; password.type = 'password'; I18n.attr(password, 'placeholder', 'F1 paskyros slaptažodis'); password.autocomplete = 'current-password'; password.maxLength = 512; focusKey(password, 'account-password');
       var emailLabel = node('label', 'El. paštas'); emailLabel.htmlFor = email.id; var passwordLabel = node('label', 'Slaptažodis'); passwordLabel.htmlFor = password.id;
       var submit = focusKey(button('Prisijungti', function () {}, 'primary-button'), 'account-login'); submit.type = 'submit'; message.setAttribute('role', 'status');message.setAttribute('aria-live','polite');message.id='f1-login-message';
       var emailField=node('div','','login-field'),passwordField=node('div','','login-field');emailField.appendChild(emailLabel);emailField.appendChild(email);passwordField.appendChild(passwordLabel);passwordField.appendChild(password);form.appendChild(emailField);form.appendChild(passwordField);form.appendChild(submit);form.appendChild(message);
       form.onsubmit = function (event) {
-        event.preventDefault(); if (submit.disabled) return;
+        event.preventDefault(); if (submit.disabled) return; cancelPhoneScreen();
         var secret = password.value; password.value = ''; submit.disabled = true; message.setAttribute('data-state','pending'); I18n.setText(message, 'Jungiamasi prie F1…');
         window.ApexStandalone.login(email.value.trim(), secret).then(function () { secret = ''; refreshAccount(); }, function (e) { secret = ''; submit.disabled = false; message.setAttribute('data-state','error'); I18n.setText(message, e.message || 'Prisijungti nepavyko.'); password.focus(); });
       };
-      box.appendChild(form);box.appendChild(node('p',setupText('Prisijungimas tiesiai į F1. Slaptažodžio neišsaugome.','Sign in directly with F1. Your password is not saved.'),'login-privacy'));
+      form.hidden=true;
+      box.appendChild(focusKey(button(setupText('Arba prisijungti su el. paštu','Or sign in with email'),function(){cancelPhoneScreen();phonePanel.hidden=true;phoneStart.disabled=false;form.hidden=!form.hidden;if(!form.hidden)email.focus();},'secondary-button'),'account-email-options'));
+      box.appendChild(form);box.appendChild(node('p',setupText('Prisijungimas tiesiai į F1. Slaptažodžio neišsaugome. Kompiuterio nereikia.','Sign in directly with F1. Your password is not saved. No computer needed.'),'login-privacy'));
       var diagnostics=node('pre','','login-diagnostics'); diagnostics.hidden=true;
       function showLoginDiagnostics(){diagnostics.textContent=JSON.stringify(window.ApexStandalone.loginDiagnostics(),null,2);diagnostics.hidden=false;}
       box.appendChild(focusKey(button(setupText('Rodyti prisijungimo diagnostiką','Show sign-in diagnostics'),showLoginDiagnostics,'secondary-button'),'account-login-diagnostics'));
       box.appendChild(diagnostics);
+      function phoneFailure(e){if(e.cancelled)return;phoneStart.disabled=false;phonePanel.hidden=false;phonePanel.textContent='';phonePanel.appendChild(node('p',e.deviceError==='expired_token'||e.deviceError==='invalid_grant'?setupText('Kodas nebegalioja. Sukurk naują kodą.','This code is no longer valid. Request a new code.'):e.deviceError==='access_denied'?setupText('F1 susiejimas nepatvirtintas.','F1 pairing was not approved.'):(e.message||setupText('Nepavyko pasiekti F1.','Could not reach F1.')),'login-message'));showLoginDiagnostics();phoneStart.focus();}
+      function startPhoneScreen(){
+        cancelPhoneScreen();form.hidden=true;official.hidden=true;phoneStart.disabled=true;phonePanel.hidden=false;phonePanel.textContent='';
+        var active=true,timer=null,expires=0,status=node('p',setupText('Kuriamas F1 kodas…','Requesting an F1 code…'),'phone-status');phonePanel.appendChild(status);
+        phoneLoginCleanup=function(){active=false;clearTimeout(timer);window.ApexStandalone.cancelPhoneLogin();};
+        function currentPhone(){return active&&document.contains(box)&&!document.hidden;}
+        function poll(){
+          if(!currentPhone()){cancelPhoneScreen();return;}
+          window.ApexStandalone.pollPhoneLogin().then(function(result){
+            if(!currentPhone())return;
+            if(result.state==='signedIn'){cancelPhoneScreen();refreshAccount();return;}
+            var remaining=Math.max(0,Math.ceil((expires-Date.now())/1000));status.textContent=setupText('Patvirtink telefone · liko ','Approve on your phone · ')+Math.floor(remaining/60)+':'+('0'+remaining%60).slice(-2);
+            timer=setTimeout(poll,result.retryAfter);
+          },function(e){if(!active)return;cancelPhoneScreen();phoneFailure(e);});
+        }
+        window.ApexStandalone.startPhoneLogin().then(function(info){
+          if(!currentPhone()){cancelPhoneScreen();return;}expires=info.expires;phonePanel.textContent='';
+          var qr=node('canvas','','phone-qr'),code=node('p',info.code,'phone-code');qr.setAttribute('role','img');qr.setAttribute('aria-label',setupText('Oficialaus F1 susiejimo QR kodas','Official F1 pairing QR code'));
+          try{var matrix=qrcode(0,'M');matrix.addData(info.url);matrix.make();var count=matrix.getModuleCount(),cell=7,size=(count+8)*cell;qr.width=size;qr.height=size;var paint=qr.getContext('2d');paint.fillStyle='#fff';paint.fillRect(0,0,size,size);paint.fillStyle='#000';for(var y=0;y<count;y++)for(var x=0;x<count;x++)if(matrix.isDark(y,x))paint.fillRect((x+4)*cell,(y+4)*cell,cell,cell);phonePanel.appendChild(qr);}catch(_){/* Visible URL and code remain usable if QR drawing is unavailable. */}
+          phonePanel.appendChild(node('p',setupText('Nuskenuok QR arba telefone atidaryk f1.com/pair.','Scan the QR or open f1.com/pair on your phone.'),'phone-instructions'));phonePanel.appendChild(code);
+          phonePanel.appendChild(node('p',setupText('Jei prašo „TV code“, įvesk šį kodą telefone.','If asked for a “TV code”, enter this code on your phone.'),'phone-instructions'));
+          status.textContent=setupText('Laukiama patvirtinimo telefone…','Waiting for approval on your phone…');phonePanel.appendChild(status);
+          var cancel=focusKey(button(setupText('Atšaukti','Cancel'),function(){cancelPhoneScreen();phonePanel.textContent='';phonePanel.hidden=true;phoneStart.disabled=false;phoneStart.focus();},'secondary-button'),'account-phone-cancel');phonePanel.appendChild(cancel);cancel.focus();timer=setTimeout(poll,info.retryAfter);
+        },function(e){if(!active)return;cancelPhoneScreen();phoneFailure(e);});
+      }
       var official=node('section','','official-login');official.hidden=true;
-      box.appendChild(focusKey(button(setupText('Prisijungimas per oficialų F1 langą','Sign in through the official F1 window'),function(){official.hidden=!official.hidden;if(!official.hidden)pairing.focus();},'secondary-button'),'account-official-options'));
+      box.appendChild(focusKey(button(setupText('Prisijungimas per oficialų F1 langą','Sign in through the official F1 window'),function(){cancelPhoneScreen();phonePanel.hidden=true;phoneStart.disabled=false;official.hidden=!official.hidden;if(!official.hidden)pairing.focus();},'secondary-button'),'account-official-options'));
       official.appendChild(node('h3',setupText('Oficialus F1 prisijungimas','Official F1 sign-in')));
       official.appendChild(node('p',setupText('Jei F1 atmeta tiesioginį prisijungimą: kompiuteryje paleisk Apex TV companion, prisijunk oficialiame F1 lange ir sukurk TV susiejimo kodą. Įklijuok jį čia. Kompiuterio reikia tik susiejimui arba pakartotiniam prisijungimui.','If F1 rejects direct sign-in: run the Apex TV companion on a computer, sign in in the official F1 window, and create a TV pairing code. Paste it here. The computer is needed only for pairing or signing in again.')));
       var pairing=node('textarea');pairing.maxLength=4096;pairing.rows=3;pairing.autocomplete='off';pairing.spellcheck=false;pairing.setAttribute('autocapitalize','off');
@@ -5700,7 +5834,7 @@ window.ApexProtectionProbe = {
       pairing.setAttribute('placeholder',setupText('Įklijuok susiejimo kodą tik iš savo kompiuterio','Paste the pairing code only from your own computer'));
       focusKey(pairing,'account-official-code');official.appendChild(pairing);
       var pairButton=focusKey(button(setupText('Susieti oficialų prisijungimą','Link official sign-in'),function(){
-        if(pairButton.disabled)return;var code=pairing.value;pairing.value='';pairButton.disabled=true;
+        if(pairButton.disabled)return;cancelPhoneScreen();var code=pairing.value;pairing.value='';pairButton.disabled=true;
         window.ApexStandalone.loginOfficial(code).then(function(){code='';refreshAccount();},function(e){code='';pairButton.disabled=false;message.setAttribute('data-state','error');I18n.setText(message,e.message);showLoginDiagnostics();pairing.focus();});
       },'secondary-button'),'account-official-link');
       official.appendChild(pairButton);box.appendChild(official);
@@ -6190,6 +6324,7 @@ window.ApexProtectionProbe = {
   }
   function refreshAccount() {request('/api/status').then(function(data){account=data.account;var state=setupStore.state();if(current.tab==='home'&&!playing&&!state.deferred&&state.phase!=='done'&&(state.phase!=='welcome'||!account||!account.signedIn))current={tab:'setup',title:setupText('Pirmas paleidimas','Getting started')};render();}).catch(function(e){error(layout(),e.message,refreshAccount);});}
   function goBack() {
+    cancelPhoneScreen();
     cancelRecovery();if(modal){closeModal();return;}if(playing){if(!overlay.hidden){hideOverlay();return;}stopPlayback();return;}if(stack.length){current=stack.pop();render();return;}if(current.tab!=='home'){showTab('home','Pradžia');return;}
     var sidebar=root.querySelector('.tv-sidebar');if(sidebar&&!sidebar.contains(document.activeElement)){var chosen=sidebar.querySelector('.selected');current.sidebarReturn=document.activeElement&&document.activeElement.getAttribute('data-focus-key');if(chosen)chosen.focus();return;}
     dialog('Uždaryti Apex TV?','Žiūrėjimo vieta ir nustatymai jau išsaugoti šiame televizoriuje.',[{label:'Likti čia',default:true},{label:'Uždaryti',run:function(){if(window.tizen&&tizen.application)tizen.application.getCurrentApplication().exit();}}]);
@@ -6466,7 +6601,7 @@ window.ApexProtectionProbe = {
       setInterval(function () { if (!playing && !document.hidden) request('/api/status').then(function (data) { account = data.account; if (ctx.standalone && account && account.signedIn && account.expires < Date.now()/1000+1800) window.ApexStandalone.refresh().catch(function () {}); }).catch(function () {}); }, 30000);
       if (!ctx.preview) { setInterval(pollTvCommand, 2000); pollTvCommand(); }
       window.addEventListener('offline',updateConnection);window.addEventListener('online',function(){updateConnection();if(!document.hidden&&!playing&&!recoveryPending){catalogueCache.clear();render();}});
-      document.addEventListener('visibilitychange',function(){if(document.hidden){cancelRecovery();if(playing)stopPlayback();else{pendingRequest++;var status=root.querySelector('.request-status');if(status)status.remove();}}else if(!playing)render();});
+      document.addEventListener('visibilitychange',function(){if(document.hidden){cancelPhoneScreen();cancelRecovery();if(playing)stopPlayback();else{pendingRequest++;var status=root.querySelector('.request-status');if(status)status.remove();}}else if(!playing)render();});
     }
   };
 }());

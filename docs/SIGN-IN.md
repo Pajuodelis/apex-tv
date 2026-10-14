@@ -1,5 +1,27 @@
 # Sign-in troubleshooting and official browser fallback
 
+## Phone sign-in (local 0.5.9 candidate)
+
+Choose **Sign in with your phone** on the TV, scan the QR and finish sign-in
+on the official `https://f1.com/pair` page. If F1 asks for a **TV code**, enter
+the code shown by Apex TV on your phone. No computer or Apex relay is needed.
+The QR does not contain your password or account token.
+
+The app uses F1's public OAuth device flow and follows the server's polling
+interval. Codes expire, cancellation stops polling, and HTTP 403 is terminal.
+The returned nested F1 subscription token must pass the existing signature,
+subscription and region checks before storage in the TV's encrypted vault.
+OAuth access/refresh tokens and the private device code are not persisted.
+
+Diagnostics distinguish **phone code request**, **phone approval**, **session
+signature**, **subscription**, **region**, and **storage**. They omit credentials
+and codes. F1's own account, region and subscription restrictions still apply.
+
+Phone approval plus F1 signature, entitlement and LT region were verified
+against the real service on 2026-10-14. Physical-TV QR, sign-in, persistence
+and playback validation remain pending while the TV is off. This is not yet
+a published release or a confirmation of all Tizen models.
+
 The TV's direct sign-in uses F1's password API. F1 can reject that request,
 including with HTTP 403. This does not by itself indicate a leaked password.
 Do not repeatedly retry a rejected request.

@@ -505,7 +505,9 @@
     entitlement: "F1 prenumeratos prieiga",
     location: "F1 regiono patikra",
     storage: "TV sesijos išsaugojimas",
-    pairing: "Oficialaus prisijungimo susiejimas"
+    pairing: "Oficialaus prisijungimo susiejimas",
+    device_code: "F1 telefono kodo sukūrimas",
+    device_token: "F1 telefono patvirtinimas"
   };
   function resetLogin(mode) { loginTrace = []; loginMode = mode; }
   async function loginStep(stage, run) {
@@ -533,6 +535,102 @@
     return { version: 1, mode: loginMode, steps: loginTrace.map(function (e) {
       return { stage: e.stage, state: e.state, status: e.status, responseKind: e.responseKind };
     }) };
+  }
+  // Public F1 TV OAuth device client. All traffic goes directly to F1;
+  // device and OAuth tokens live only in this closure, never in diagnostics.
+  var phonePairing = null;
+  var deviceClientId = "13c21153-f2f3-484b-a642-f2a2927e55de";
+  function cancelPhoneLogin() {
+    if (!phonePairing) return;
+    phonePairing.cancelled = true;
+    if (phonePairing.controller) phonePairing.controller.abort();
+    phonePairing.deviceCode = "";
+    phonePairing = null;
+  }
+  function requirePhonePairing(session) {
+    if (phonePairing !== session || session.cancelled) {
+      var cancelled = new Error("Susiejimas atšauktas."); cancelled.cancelled = true; throw cancelled;
+    }
+    if (Date.now() >= session.expires) { var expired = new Error("F1 kodas pasibaigė. Sukurk naują kodą."); expired.deviceError = "expired_token"; throw expired; }
+  }
+  async function deviceRequest(session, path, fields) {
+    var controller = new AbortController(); session.controller = controller;
+    var timer = setTimeout(function () { controller.abort(); }, 20000);
+    try {
+      var response = await fetch("https://id.formula1.com/as/" + path, {
+        method: "POST", redirect: "error", credentials: "omit", signal: controller.signal,
+        headers: { "Content-Type": "application/x-www-form-urlencoded", Accept: "application/json" },
+        body: Object.keys(fields).map(function (key) { return encodeURIComponent(key) + "=" + encodeURIComponent(fields[key]); }).join("&")
+      });
+      if (phonePairing !== session || session.cancelled) { var stopped = new Error("Susiejimas atšauktas."); stopped.cancelled = true; throw stopped; }
+      var type = (response.headers.get("content-type") || "").toLowerCase();
+      var text = await response.text(), data;
+      if (text.length > 128 * 1024) throw new Error("F1 susiejimo atsakymas per didelis.");
+      try { data = JSON.parse(text); } catch (_) { data = null; }
+      // Only documented waiting states are retryable; HTTP 403 is never retried.
+      if (response.status === 400 && data && (data.error === "authorization_pending" || data.error === "slow_down")) return { waiting: data.error };
+      if (!response.ok) {
+        var error = new ServiceError("F1 susiejimas atmestas.", response.status);
+        error.upstreamStatus = response.status;
+        error.responseKind = /html/.test(type) ? "html" : /json/.test(type) ? "json" : "other";
+        if (data && ["expired_token", "access_denied", "invalid_grant"].indexOf(data.error) >= 0) error.deviceError = data.error;
+        throw error;
+      }
+      if (!data || typeof data !== "object") throw new Error("F1 susiejimo atsakymas netinkamas.");
+      return data;
+    } finally { clearTimeout(timer); if (session.controller === controller) session.controller = null; }
+  }
+  async function startPhoneLogin() {
+    cancelPhoneLogin(); resetLogin("phone");
+    var session = { cancelled: false, deviceCode: "", expires: Date.now() + 600000, interval: 5000, nextPoll: 0, busy: false };
+    phonePairing = session;
+    try {
+      return await loginStep("device_code", async function () {
+        var data = await deviceRequest(session, "device_authorization", { client_id: deviceClientId, scope: "openid f1tv_groups" });
+        requirePhonePairing(session);
+        if (typeof data.device_code !== "string" || !data.device_code || data.device_code.length > 8192 || !/^[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(data.user_code) || !Number.isFinite(data.expires_in) || data.expires_in < 1 || data.expires_in > 1800) throw new Error("F1 nepateikė galiojančio TV kodo.");
+        var uri = new URL(data.verification_uri);
+        if (uri.protocol !== "https:" || uri.hostname !== "f1.com" || uri.pathname !== "/pair" || uri.port || uri.username || uri.password || uri.search || uri.hash) throw new Error("F1 susiejimo adresas netinkamas.");
+        session.deviceCode = data.device_code;
+        session.expires = Date.now() + data.expires_in * 1000;
+        session.interval = Math.max(5, Math.min(60, Number(data.interval) || 5)) * 1000;
+        session.nextPoll = Date.now() + session.interval;
+        // Construct the QR from the validated official URI and visible code only.
+        return { code: data.user_code, url: uri.href + "?user_code=" + encodeURIComponent(data.user_code), expires: session.expires, retryAfter: session.interval };
+      });
+    } catch (error) { if (phonePairing === session) cancelPhoneLogin(); throw error; }
+  }
+  async function pollPhoneLogin() {
+    var session = phonePairing;
+    if (!session) { var stopped = new Error("Susiejimas atšauktas."); stopped.cancelled = true; throw stopped; }
+    try {
+      requirePhonePairing(session);
+      if (session.busy || Date.now() < session.nextPoll) return { state: "waiting", retryAfter: Math.max(1000, session.nextPoll - Date.now()) };
+      session.busy = true;
+      return await loginStep("device_token", async function () {
+        var data = await deviceRequest(session, "token", { client_id: deviceClientId, grant_type: "urn:ietf:params:oauth:grant-type:device_code", device_code: session.deviceCode });
+        requirePhonePairing(session);
+        if (data.waiting) {
+          if (data.waiting === "slow_down") session.interval += 5000;
+          session.nextPoll = Date.now() + session.interval;
+          return { state: "waiting", retryAfter: session.interval };
+        }
+        var claims, parts = typeof data.access_token === "string" && data.access_token.length <= 64000 ? data.access_token.split(".") : [];
+        try { claims = JSON.parse(new TextDecoder().decode(decode64(parts[1]))); } catch (_) { throw new Error("F1 nepateikė prenumeratos sesijos."); }
+        // OAuth envelope is not an Ascendon token. Trust only the nested session
+        // after the existing independent RS256 + entitlement + region checks.
+        var token = claims.subscriptionToken;
+        if (typeof token !== "string" || !token || token.length > 32000) throw new Error("F1 nepateikė prenumeratos sesijos.");
+        var verified = new F1Client(); await verified.signIn(token, false);
+        requirePhonePairing(session);
+        await loginStep("storage", function () { return client.vault.save(token); });
+        client.token = verified.token; client.entitlement = verified.entitlement;
+        client.location = verified.location; client.expires = verified.expires; client.error = "";
+        cancelPhoneLogin();
+        return { state: "signedIn", account: client.status() };
+      });
+    } catch (error) { if (phonePairing === session) cancelPhoneLogin(); throw error; }
+    finally { session.busy = false; }
   }
   function pairingConfig(raw) {
     if (typeof raw !== "string" || raw.length > 4096) throw new Error("Netinkamas susiejimo kodas.");
@@ -799,7 +897,8 @@
     return vaultGet("events").then(function(events) {
       return events || [];
     });
-  }, client, initialize, request, provision, refresh: refreshSession, login, loginOfficial, loginDiagnostics, signOut: function() {
+  }, client, initialize, request, provision, refresh: refreshSession, login, loginOfficial, loginDiagnostics, startPhoneLogin, pollPhoneLogin, cancelPhoneLogin, signOut: function() {
+    cancelPhoneLogin();
     editorial.clear(); discovery.clear();
     return client.signOut();
   } };

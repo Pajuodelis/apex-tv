@@ -3,6 +3,8 @@
   'use strict';
   var EN={
   "F1 paskyros prisijungimas": "F1 account authentication",
+  "F1 telefono kodo sukūrimas": "F1 phone code request",
+  "F1 telefono patvirtinimas": "F1 phone approval",
   "F1 sesijos parašas": "F1 session signature",
   "F1 prenumeratos prieiga": "F1 subscription access",
   "F1 regiono patikra": "F1 region check",

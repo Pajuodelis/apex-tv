@@ -37,7 +37,7 @@ test('an unavailable commentary catalog leaves known audio languages usable',asy
 test('Back closes a dialog, hides controls without stopping playback, then exits on another press',()=>{
   let stopped=0,closed=0,blurred=0,timerCleared=0;const focused={blur(){blurred++;}};
   const c={playing:true,modal:{},overlay:{hidden:false,contains:element=>element===focused},document:{activeElement:focused},hideTimer:7,overlayDismissed:false,cancelRecovery(){},closeModal(){closed++;c.modal=null;},stopPlayback(){stopped++;},clearTimeout(timer){assert.equal(timer,7);timerCleared++;}};
-  vm.createContext(c);vm.runInContext(piece('goBack','streamAudioChoices')+piece('hideOverlay','toggle'),c);
+  vm.createContext(c);vm.runInContext('var phoneLoginCleanup=null;'+piece('cancelPhoneScreen','render')+piece('goBack','streamAudioChoices')+piece('hideOverlay','toggle'),c);
   c.goBack();assert.equal(closed,1);assert.equal(stopped,0);assert.equal(c.overlay.hidden,false);
   c.goBack();assert.equal(c.overlay.hidden,true);assert.equal(stopped,0);assert.equal(blurred,1);assert.equal(timerCleared,1);assert.equal(c.overlayDismissed,true);
   c.goBack();assert.equal(stopped,1);
