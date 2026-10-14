@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.5.9 — 2026-10-14
+
+- Sign in with your phone: scan the TV's QR, sign in on the official F1 page and approve the displayed code. No computer or Apex account relay is required for this flow.
+- Clear waiting, expiration and denial states; Back, screen changes and cancellation stop polling. Requests respect F1's polling interval and slow-down responses; HTTP 403 is terminal.
+- Verify the nested F1 session's signature, subscription and region before saving it in the TV's existing encrypted vault. OAuth access/refresh tokens and the private device code are not persisted.
+- Diagnostics distinguish phone code creation and approval from session signature, subscription, region and storage. Credentials, tokens and codes are excluded.
+- English and Lithuanian UI, manual code entry fallback, and existing email/desktop sign-in alternatives retained. Existing account sessions, player behavior, app ID and pinned update key are unchanged.
+- Validation: 230 automated tests passed; real official phone approval, F1 signature, subscription and LT region verified. These checks do not establish compatibility with every physical Tizen model.
+
 ## 0.5.8 — 2026-10-14
 
 - Sign-in diagnostics identify authentication, signature, subscription, region and storage failures instead of showing the same generic HTTP 403 at every step. Reports contain no account credentials, tokens or response bodies.

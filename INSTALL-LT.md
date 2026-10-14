@@ -38,8 +38,11 @@ TV sertifikatu. Sertifikato ir paskyrų slaptažodžių niekam siųsti nereikia.
 
 ## 4. Prisijunk televizoriuje
 
-Paleisk **Apex TV**, pasirink prisijungimą ir televizoriuje įvesk savo F1 TV
-paskyros duomenis. Apps2Samsung nereikia duoti F1 slaptažodžio. Pirmo paleidimo
+Paleisk **Apex TV → Prisijungti telefonu**, nuskenuok QR ir prisijunk savo
+F1 TV paskyra oficialiame F1 puslapyje. Jei prašo „TV code“, telefone įvesk
+televizoriaus rodomą kodą ir patvirtink. Šiam prisijungimui kompiuterio nereikia.
+Prisijungimas su el. paštu lieka kaip alternatyva. Apps2Samsung nereikia duoti
+F1 slaptažodžio. Pirmo paleidimo
 vedlys nuosekliai parodo prisijungimą, vaizdo ir garso patikrą bei pridėjimą
 prie Home. Patikros rezultatą patvirtini pats. Vedlį pakartosi per
 **Nustatymai → Pirmo paleidimo vedlys**.

@@ -52,7 +52,11 @@ must use the same author certificate as the original installation.
 
 ## 4. Sign in and start watching
 
-Open **Apex TV** and sign in with your own F1 TV account **on the television**.
+Open **Apex TV → Sign in with your phone**, scan the QR and sign in with
+your own F1 TV account on F1's official website. If asked for a **TV code**,
+enter the code displayed on the television into the phone page. The TV
+completes sign-in after you approve. No computer is required for this step.
+Email sign-in remains available as an alternative.
 Apps2Samsung does not need your F1 TV password. The first-run guide takes
 you through sign-in, a picture and sound check, and Add to Home. You confirm
 the test result yourself; a moving player clock alone does not pass it.

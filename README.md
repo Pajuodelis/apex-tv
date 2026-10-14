@@ -26,6 +26,7 @@ remote. After installation, no phone or computer needs to stay running.
 - Receive signed menu and player updates directly on the TV.
 - Browse highlights, Race in 30, official F1 shows and documentaries.
 - Sign in with a clean English or Lithuanian screen and readable inline errors.
+- Sign in on your phone using an official F1 QR/code pairing flow, without a computer.
 - Follow a first-run guide for sign-in, picture/sound checks and Add to Home.
 - Run compatibility checks and share an allowlisted diagnostic report as a local QR code.
 - Use four primary player actions and a remote timeline: Up, arrows to choose, OK to seek; holding an arrow accelerates.
@@ -110,7 +111,11 @@ Browser previews below use sample data. No real account details or race footage 
 
 ### Sign-in rejected with HTTP 403?
 
-Version 0.5.8 reports the exact failed sign-in step. Use **Show sign-in
+Version 0.5.9 adds **Sign in with your phone**: scan the TV's QR and approve
+on F1's official page. If asked for a **TV code**, enter the displayed code
+on your phone. No computer or Apex account server is involved.
+
+The app reports the exact failed sign-in step. Use **Show sign-in
 diagnostics** on the TV; the report excludes account credentials and tokens.
 An alternative uses the official F1 window in the optional desktop companion
 and a private, encrypted TV session handoff. A computer is needed for that
