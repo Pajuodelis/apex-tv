@@ -2,6 +2,15 @@ import test from 'node:test';import assert from 'node:assert/strict';import fs f
 import UI from '../web/ui-performance.js';import UX from '../web/experience.js';
 const source=await fs.readFile(new URL('../web/tv-app.js',import.meta.url),'utf8');
 import {player} from './support/player-fixture.mjs';
+import vm from 'node:vm';
+
+test('repeated English labels reuse a bounded translation cache and retain language switching',async()=>{
+ let writes=0,peak=0;class Cache extends Map{set(k,v){writes++;super.set(k,v);peak=Math.max(peak,this.size);return this;}}
+ const c={window:{APEX_CONFIG:{uiLanguage:'en'}},Map:Cache};vm.createContext(c);vm.runInContext(await fs.readFile(new URL('../web/i18n.js',import.meta.url),'utf8'),c);const i=c.window.ApexI18n;
+ for(let n=0;n<1000;n++)assert.equal(i.text('Pauzė'),'Pause');assert.equal(writes,1);
+ i.setLanguage('lt');assert.equal(i.text('Pauzė'),'Pauzė');i.setLanguage('en');assert.equal(i.text('Pauzė'),'Pause');
+ for(let n=0;n<600;n++)i.text('Pauzė '+n);assert.equal(peak,256);const prior=writes;i.text('x'.repeat(2049));assert.equal(writes,prior);
+});
 test('one shared native player snapshot per tick preserves health and highest selected quality',()=>{
  const p=player();p.c.updatePlayer();assert.deepEqual([p.counts.state,p.counts.time,p.counts.duration],[1,1,1]);assert.equal(p.counts.health,1);assert.equal(p.counts.fullStoreCopies,0);assert.equal(p.ids['player-quality'].textContent,'Kokybė: 1080p · 50 fps · 6.14 Mb/s');
 });
@@ -28,6 +37,13 @@ test('TV thumbnail loading waits for visibility, caps simultaneous decodes and s
 });
 test('poster fallback remains visible until image success, and non-Observer TVs load only after DOM attachment',()=>{
  const env=clock(),pic=image(),fallback=image();let attached=false;const loader=UI.images(env,{contains:()=>attached});loader.add(pic,'hero',fallback,true);assert.equal(pic.src,'');attached=true;env.run(0);assert.equal(pic.src,'hero');assert.equal(fallback.style.visibility,undefined);pic.onerror();assert.equal(pic.removed,true);assert.equal(fallback.style.visibility,undefined);
+});
+test('stalled thumbnails release both loading slots and permit the next visible images',()=>{
+ const env=clock(),pics=Array.from({length:4},image),loader=UI.images(env,{contains:img=>!img.removed});pics.forEach((img,i)=>loader.add(img,'image-'+i,image(),true));env.run(0);assert.equal(pics.filter(i=>i.src).length,2);env.run(15000);assert.equal(pics[0].removed,true);assert.equal(pics[1].removed,true);assert.equal(pics[2].src,'image-2');assert.equal(pics[3].src,'image-3');loader.reset();assert.equal(env.tasks.size,0);
+});
+test('replacing search results prunes detached loads and observations without starting obsolete work',()=>{
+ const env=clock(),pics=Array.from({length:6},image);let observer;const unobserved=new Set();env.IntersectionObserver=class{constructor(cb){observer=cb;}observe(){}unobserve(img){unobserved.add(img);}disconnect(){}};
+ const loader=UI.images(env,{contains:img=>!img.detached&&!img.removed});pics.forEach((img,i)=>loader.add(img,'image-'+i,image(),false));observer(pics.slice(0,4).map(target=>({target,isIntersecting:true})));const old=pics[0].onload;pics.forEach(i=>i.detached=true);loader.prune();assert.equal(unobserved.size,6);assert.ok(pics.every(i=>!i.src));old();const next=image();loader.add(next,'new-result',image(),true);env.run(0);assert.equal(next.src,'new-result');loader.reset();
 });
 test('spatial focus reuses geometry until scroll, resize, disabled state or layout changes',()=>{
  const handlers={},env={addEventListener:(name,fn)=>handlers[name]=fn};let invalidate,reads=0;env.MutationObserver=class{constructor(fn){invalidate=fn;}observe(){}};const list=Array.from({length:24},(_,i)=>({disabled:false,offsetParent:{},getBoundingClientRect(){reads++;return{left:i%4*100,top:Math.floor(i/4)*100,width:90,height:90};}}));const root={querySelectorAll:()=>list,addEventListener:(n,f)=>handlers[n]=f},move=UI.spatial(root,env);assert.equal(move(list[0],39),list[1]);assert.equal(reads,24);assert.equal(move(list[1],40),list[5]);assert.equal(reads,24);handlers.scroll();move(list[5],40);assert.equal(reads,48);list[9].disabled=true;invalidate();assert.notEqual(move(list[5],40),list[9]);assert.equal(reads,71);handlers.resize();move(list[5],39);assert.equal(reads,94);

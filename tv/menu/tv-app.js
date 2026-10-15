@@ -2833,7 +2833,8 @@ return{store:store,identity:identity,platform:platform,report:report,failureCode
   var keys=Object.keys(EN).sort(function(a,b){return b.length-a.length;}),letters='A-Za-z0-9_ąčęėįšųūžĄČĘĖĮŠŲŪŽ';
   function escape(value){return value.split('').map(function(char){return '.*+?^${}()|[]\\'.indexOf(char)>=0?'\\'+char:char;}).join('');}
   var pattern=new RegExp('(^|[^'+letters+'])('+keys.map(escape).join('|')+')(?=$|[^'+letters+'])','g');
-  function text(value){var source=value==null?'':String(value);if(language!=='en'||!source)return source;return source.replace(pattern,function(_,lead,key){return lead+EN[key];});}
+  var translatedCache=new Map();
+  function text(value){var source=value==null?'':String(value);if(language!=='en'||!source)return source;if(translatedCache.has(source))return translatedCache.get(source);var translated=source.replace(pattern,function(_,lead,key){return lead+EN[key];});if(source.length<=2048){if(translatedCache.size>=256)translatedCache.delete(translatedCache.keys().next().value);translatedCache.set(source,translated);}return translated;}
   function setText(element,value){if(!element)return;var source=value==null?'':String(value),translated=text(source);if(element.textContent!==translated)element.textContent=translated;if(element.firstChild&&element.firstChild.nodeType===3&&element.childNodes.length===1)textSources.set(element.firstChild,source);return value;}
   function attr(element,name,value){if(!element)return;var source=value==null?'':String(value),values=attrSources.get(element)||{};values[name]=source;attrSources.set(element,values);var translated=text(source);if(element.getAttribute(name)!==translated)element.setAttribute(name,translated);}
   function localize(element){if(!element)return;
@@ -2886,7 +2887,7 @@ return{controller:controller};
     } };
   }
   function images(env, document) {
-    var observer = null, queue = [], pending = [], flights = [], active = 0, generation = 0, held = false, holdTimer = 0, pumpTimer = 0;
+    var observer = null, queue = [], pending = [], flights = [], byImage = new WeakMap(), active = 0, generation = 0, held = false, holdTimer = 0, pumpTimer = 0;
     function pump() {
       while (!held && active < 2 && queue.length) {
         var entry = queue.shift(); if (!document.contains(entry.img)) continue;
@@ -2896,12 +2897,13 @@ return{controller:controller};
     function start(entry) {
       var serial = generation, done = false; active++; flights.push(entry);
       function finish(ok) {
-        if (done || serial !== generation) return; done = true; active--;
+        if (done || serial !== generation) return; done = true; active--;env.clearTimeout(entry.timer);byImage.delete(entry.img);
         flights = flights.filter(function (value) { return value !== entry; });
         entry.img.onload = entry.img.onerror = null;
         if (document.contains(entry.img)) { if (ok) style(entry.fallback, 'visibility', 'hidden'); else entry.img.remove(); }
         pump();
       }
+      entry.cancel=function(){finish(false);entry.img.removeAttribute('src');};entry.timer=env.setTimeout(entry.cancel,15000);
       entry.img.onload = function () { finish(true); }; entry.img.onerror = function () { finish(false); }; entry.img.src = entry.url;
     }
     function enqueue(entry) {
@@ -2912,18 +2914,24 @@ return{controller:controller};
     function reset() {
       generation++; env.clearTimeout(holdTimer);env.clearTimeout(pumpTimer); held = false;
       if (observer) observer.disconnect(); observer = null;
-      flights.forEach(function (entry) { entry.img.onload = entry.img.onerror = null; entry.img.removeAttribute('src'); });
+      flights.forEach(function (entry) { env.clearTimeout(entry.timer);entry.img.onload = entry.img.onerror = null; entry.img.removeAttribute('src'); });
       queue = []; pending = []; flights = []; active = 0;
+      byImage=new WeakMap();
     }
-    return { reset: reset, defer: function () {
+    function prune(){
+      function keep(entry){if(document.contains(entry.img))return true;if(observer)observer.unobserve(entry.img);byImage.delete(entry.img);return false;}
+      pending=pending.filter(keep);queue=queue.filter(keep);flights.slice().forEach(function(entry){if(!document.contains(entry.img))entry.cancel();});
+    }
+    return { reset: reset, prune:prune, defer: function () {
       held = true; env.clearTimeout(holdTimer); holdTimer = env.setTimeout(function () { held = false; pump(); }, 120);
     }, add: function (img, url, fallback, large) {
       var entry = { img: img, url: url, fallback: fallback, large: large, queued: false };
+      byImage.set(img,entry);
       if (large || !env.IntersectionObserver) { queue.push(entry); entry.queued = true; env.clearTimeout(pumpTimer);pumpTimer=env.setTimeout(pump,0); return; }
       pending.push(entry);
       if (!observer) observer = new env.IntersectionObserver(function (entries) {
         entries.forEach(function (value) { if (!value.isIntersecting) return;
-          var entry = pending.filter(function (item) { return item.img === value.target; })[0];
+          var entry = byImage.get(value.target);
           if (entry) { observer.unobserve(entry.img); enqueue(entry); }
         });
       }, { rootMargin: '160px 120px', threshold: 0.01 });
@@ -5560,13 +5568,13 @@ window.ApexProtectionProbe = {
   function compactTitle(raw){return String(raw||'').replace(/^FORMULA 1\s+/i,'').replace(/\s+(?:GRAND PRIX)\s+((?:19|20)\d{2})$/i,' GP $1');}
   function sessionTitle(raw){return String(raw||'').replace(/^\d{4}\s+.*?\sGP\s*[-–]\s*/i,'').replace(/^\d{4}\s+.+\sGrand Prix$/i,'Race').replace(/\bRace\b/gi,'Lenktynės').replace(/\bSprint Qualifying\b/gi,'Sprinto kvalifikacija').replace(/Qualifying/gi,'Kvalifikacija').replace(/Practice\s*(\d)/gi,'Treniruotė $1').replace(/\bSprint\b/gi,'Sprintas').replace(/Grand Prix/gi,'Lenktynės');}
   function renderHeroSchedule(main,data){
-    var hero=main.querySelector('.tv-hero');if(!hero)return;var previous=hero.querySelector('.hero-schedule');if(previous&&previous.contains(document.activeElement))return;if(previous)previous.remove();
+    var hero=main.querySelector('.tv-hero');if(!hero)return;var previous=hero.querySelector('.hero-schedule');if(previous&&previous.contains(document.activeElement))return;
+    var items=Discovery.upcoming(data,Date.now()),signature=JSON.stringify([I18n.language(),data&&data.meeting&&(data.meeting.subtitle||data.meeting.title),items.map(function(i){return[i.id,i.title,i.start,Boolean(i.live)];})]);if(previous&&hero.scheduleSignature===signature)return;if(previous)previous.remove();
     var panel=node('section','','hero-schedule');panel.setAttribute('aria-label',setupText('Artimiausios F1 sesijos','Upcoming F1 sessions'));panel.appendChild(node('span',setupText('ARTIMIAUSIA TRASOJE','COMING UP'),'eyebrow'));panel.appendChild(node('h2',data&&data.meeting?compactTitle(data.meeting.subtitle||data.meeting.title):setupText('Lenktynių savaitgalis','Race weekend')));
-    var items=Discovery.upcoming(data,Date.now());
     if(items.length){var list=node('div','','hero-schedule-list');items.forEach(function(item){
       var row=focusKey(button('',function(){if(item.live)openItem(item);else showTab('weekend','Varžybų savaitgalis');},'hero-session'),'hero-session-'+item.id);row.appendChild(node('span',item.live?setupText('● TIESIOGIAI','● LIVE'):Discovery.localTime(item.start,true),'hero-session-time'));row.appendChild(node('strong',sessionTitle(item.title)));list.appendChild(row);
     });panel.appendChild(list);}else panel.appendChild(node('p',setupText('Artimiausių sesijų laikai atsiras, kai juos paskelbs F1.','Upcoming session times will appear when F1 publishes them.'),'hero-schedule-empty'));
-    panel.appendChild(node('p',setupText('Laikai tavo laiko juostoje','Times in your time zone'),'hero-schedule-zone'));hero.appendChild(panel);
+    panel.appendChild(node('p',setupText('Laikai tavo laiko juostoje','Times in your time zone'),'hero-schedule-zone'));hero.appendChild(panel);hero.scheduleSignature=signature;
   }
   function renderWeekendPanel(main,data,home){
     if(home){renderHeroSchedule(main,data);return;}
@@ -5691,7 +5699,7 @@ window.ApexProtectionProbe = {
     actions.appendChild(focusKey(button(driverStore.get()?'★ '+driverStore.get().name:'★ Mėgstamas lenktynininkas',favoriteCamera,'secondary-button'),'detail-favorite-driver'));copy.appendChild(actions);box.appendChild(copy);main.appendChild(box);
   }
   function renderItems(main,items,stamp,stale) {
-    current.items=items;var previous=main.querySelector('.catalog-content');if(previous)previous.remove();
+    current.items=items;var previous=main.querySelector('.catalog-content');if(previous)previous.remove();if(artworkLoader.prune)artworkLoader.prune();
     var wrap=node('section','','catalog-content'),tools=node('div','','catalog-tools');
     var searchBox=node('div','','catalog-search'),label=node('label','Paieška šiame kataloge');label.htmlFor='catalog-query';var input=focusKey(node('input'),'catalog-query');input.id='catalog-query';input.type='search';input.maxLength=80;input.value=current.query||'';I18n.attr(input, 'placeholder', 'Pavadinimas, GP ar sesija');input.autocomplete='off';
     searchBox.appendChild(label);searchBox.appendChild(input);tools.appendChild(searchBox);
@@ -5702,7 +5710,7 @@ window.ApexProtectionProbe = {
     if(current.tab==='live')tools.appendChild(focusKey(button('Atnaujinti',function(){refreshLive(true);},'secondary-button'),'catalog-refresh'));
     wrap.appendChild(tools);var meta=node('p','','catalog-summary');meta.setAttribute('role','status');meta.setAttribute('aria-live','polite');wrap.appendChild(meta);var results=node('div','','catalog-results');wrap.appendChild(results);main.appendChild(wrap);
     function paintResults(focus) {
-      I18n.setText(results, '');var found=UX.select(items,current.query,current.filter,current.sort),page=UX.page(found,current.offset);current.offset=page.index;
+      I18n.setText(results, '');if(artworkLoader.prune)artworkLoader.prune();var found=UX.select(items,current.query,current.filter,current.sort),page=UX.page(found,current.offset);current.offset=page.index;
       I18n.setText(meta, 'Rasta: '+found.length+' iš '+items.length+(page.count>1?' · '+(page.index+1)+' / '+page.count+' psl.':'')+(stamp?' · Tikrinta '+new Date(stamp).toLocaleTimeString('lt-LT',{hour:'2-digit',minute:'2-digit'}):'')+(stale?' · Rodomas ankstesnis katalogas':''));
       if(!found.length){var empty=node('div','','empty-state');empty.appendChild(node('h2',current.query||current.filter&&current.filter!=='all'?'Nieko nerasta':current.tab==='live'?'Šiuo metu transliacijų nėra':current.tab==='saved'?'Mano sąrašas kol kas tuščias':current.tab==='history'?'Žiūrėjimo istorija tuščia':'Čia kol kas tuščia'));empty.appendChild(node('p',current.tab==='live'&&!current.query?'Patikrinama kas 30 sek., kol šis ekranas atidarytas. Gali grįžti prie įrašų.':current.tab==='saved'&&!current.query?'Atidaryk įrašą ir pasirink „Į mano sąrašą“.':current.tab==='history'&&!current.query?'Žiūrėti įrašai ir išsaugota vieta atsiras čia.':'Pakeisk paiešką ar filtrą arba grįžk į kitą katalogą.'));results.appendChild(empty);}
       else{var grid=node('div','','tiles catalog-tiles');I18n.attr(grid, 'aria-label', current.title);page.items.forEach(function(i){grid.appendChild(itemCard(i));});results.appendChild(grid);}

@@ -16,7 +16,7 @@
     } };
   }
   function images(env, document) {
-    var observer = null, queue = [], pending = [], flights = [], active = 0, generation = 0, held = false, holdTimer = 0, pumpTimer = 0;
+    var observer = null, queue = [], pending = [], flights = [], byImage = new WeakMap(), active = 0, generation = 0, held = false, holdTimer = 0, pumpTimer = 0;
     function pump() {
       while (!held && active < 2 && queue.length) {
         var entry = queue.shift(); if (!document.contains(entry.img)) continue;
@@ -26,12 +26,13 @@
     function start(entry) {
       var serial = generation, done = false; active++; flights.push(entry);
       function finish(ok) {
-        if (done || serial !== generation) return; done = true; active--;
+        if (done || serial !== generation) return; done = true; active--;env.clearTimeout(entry.timer);byImage.delete(entry.img);
         flights = flights.filter(function (value) { return value !== entry; });
         entry.img.onload = entry.img.onerror = null;
         if (document.contains(entry.img)) { if (ok) style(entry.fallback, 'visibility', 'hidden'); else entry.img.remove(); }
         pump();
       }
+      entry.cancel=function(){finish(false);entry.img.removeAttribute('src');};entry.timer=env.setTimeout(entry.cancel,15000);
       entry.img.onload = function () { finish(true); }; entry.img.onerror = function () { finish(false); }; entry.img.src = entry.url;
     }
     function enqueue(entry) {
@@ -42,18 +43,24 @@
     function reset() {
       generation++; env.clearTimeout(holdTimer);env.clearTimeout(pumpTimer); held = false;
       if (observer) observer.disconnect(); observer = null;
-      flights.forEach(function (entry) { entry.img.onload = entry.img.onerror = null; entry.img.removeAttribute('src'); });
+      flights.forEach(function (entry) { env.clearTimeout(entry.timer);entry.img.onload = entry.img.onerror = null; entry.img.removeAttribute('src'); });
       queue = []; pending = []; flights = []; active = 0;
+      byImage=new WeakMap();
     }
-    return { reset: reset, defer: function () {
+    function prune(){
+      function keep(entry){if(document.contains(entry.img))return true;if(observer)observer.unobserve(entry.img);byImage.delete(entry.img);return false;}
+      pending=pending.filter(keep);queue=queue.filter(keep);flights.slice().forEach(function(entry){if(!document.contains(entry.img))entry.cancel();});
+    }
+    return { reset: reset, prune:prune, defer: function () {
       held = true; env.clearTimeout(holdTimer); holdTimer = env.setTimeout(function () { held = false; pump(); }, 120);
     }, add: function (img, url, fallback, large) {
       var entry = { img: img, url: url, fallback: fallback, large: large, queued: false };
+      byImage.set(img,entry);
       if (large || !env.IntersectionObserver) { queue.push(entry); entry.queued = true; env.clearTimeout(pumpTimer);pumpTimer=env.setTimeout(pump,0); return; }
       pending.push(entry);
       if (!observer) observer = new env.IntersectionObserver(function (entries) {
         entries.forEach(function (value) { if (!value.isIntersecting) return;
-          var entry = pending.filter(function (item) { return item.img === value.target; })[0];
+          var entry = byImage.get(value.target);
           if (entry) { observer.unobserve(entry.img); enqueue(entry); }
         });
       }, { rootMargin: '160px 120px', threshold: 0.01 });
