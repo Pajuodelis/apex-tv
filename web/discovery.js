@@ -38,5 +38,16 @@
       var start=date(i.start),end=date(i.end),key=String(i.id||start+':'+clean(i.title));if(seen[key]||!(i.live?(!end||end>now):start>now))return false;seen[key]=true;return true;
     }).sort(function(a,b){return Number(Boolean(b.live))-Number(Boolean(a.live))||date(a.start)-date(b.start);}).slice(0,4);
   }
-  return{normalize:normalize,picture:picture,date:date,query:query,search:search,chooseMeeting:chooseMeeting,program:program,create:create,localTime:localTime,upcoming:upcoming};
+  function artwork(storage){
+    var key='apex-public-artwork-v1',sources={weekend:[],editorial:[]};
+    function urls(values){var result=[];if(Array.isArray(values))values.slice(0,40).forEach(function(value){var url=picture(value&&typeof value==='object'?value.image:value);if(url&&result.indexOf(url)<0&&result.length<12)result.push(url);});return result;}
+    try{var raw=storage&&storage.getItem(key);if(raw&&raw.length<60000){var saved=JSON.parse(raw);if(saved&&saved.version===1){sources.weekend=urls(saved.weekend);sources.editorial=urls(saved.editorial);}}}catch(_){}
+    return{observe:function(source,items){
+      if(source!=='weekend'&&source!=='editorial')return false;var next=urls(items);if(!next.length||JSON.stringify(next)===JSON.stringify(sources[source]))return false;
+      sources[source]=next;try{if(storage)storage.setItem(key,JSON.stringify({version:1,weekend:sources.weekend,editorial:sources.editorial}));}catch(_){}return true;
+    },pick:function(index){
+      var pool=urls(sources.editorial.concat(sources.weekend));return pool.length?pool[Math.max(0,Math.floor(Number(index)||0))%pool.length]:'';
+    }};
+  }
+  return{normalize:normalize,picture:picture,date:date,query:query,search:search,chooseMeeting:chooseMeeting,program:program,create:create,localTime:localTime,upcoming:upcoming,artwork:artwork};
 }));

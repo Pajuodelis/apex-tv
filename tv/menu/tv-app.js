@@ -3016,7 +3016,18 @@ return{controller:controller};
       var start=date(i.start),end=date(i.end),key=String(i.id||start+':'+clean(i.title));if(seen[key]||!(i.live?(!end||end>now):start>now))return false;seen[key]=true;return true;
     }).sort(function(a,b){return Number(Boolean(b.live))-Number(Boolean(a.live))||date(a.start)-date(b.start);}).slice(0,4);
   }
-  return{normalize:normalize,picture:picture,date:date,query:query,search:search,chooseMeeting:chooseMeeting,program:program,create:create,localTime:localTime,upcoming:upcoming};
+  function artwork(storage){
+    var key='apex-public-artwork-v1',sources={weekend:[],editorial:[]};
+    function urls(values){var result=[];if(Array.isArray(values))values.slice(0,40).forEach(function(value){var url=picture(value&&typeof value==='object'?value.image:value);if(url&&result.indexOf(url)<0&&result.length<12)result.push(url);});return result;}
+    try{var raw=storage&&storage.getItem(key);if(raw&&raw.length<60000){var saved=JSON.parse(raw);if(saved&&saved.version===1){sources.weekend=urls(saved.weekend);sources.editorial=urls(saved.editorial);}}}catch(_){}
+    return{observe:function(source,items){
+      if(source!=='weekend'&&source!=='editorial')return false;var next=urls(items);if(!next.length||JSON.stringify(next)===JSON.stringify(sources[source]))return false;
+      sources[source]=next;try{if(storage)storage.setItem(key,JSON.stringify({version:1,weekend:sources.weekend,editorial:sources.editorial}));}catch(_){}return true;
+    },pick:function(index){
+      var pool=urls(sources.editorial.concat(sources.weekend));return pool.length?pool[Math.max(0,Math.floor(Number(index)||0))%pool.length]:'';
+    }};
+  }
+  return{normalize:normalize,picture:picture,date:date,query:query,search:search,chooseMeeting:chooseMeeting,program:program,create:create,localTime:localTime,upcoming:upcoming,artwork:artwork};
 }));
 
 ;
@@ -5524,21 +5535,18 @@ window.ApexProtectionProbe = {
     var paths={home:'M3 10.5 12 3l9 7.5V21h-6v-7H9v7H3Z',search:'M10 3a7 7 0 1 0 0 14 7 7 0 0 0 0-14m5 12 6 6',live:'M4 4h16v16H4Zm5 3v10l8-5Z',weekend:'M4 5h16v16H4ZM7 2v6m10-6v6M4 10h16',editorial:'M3 4h18v16H3ZM3 9h18M7 4l4 5m3-5 4 5m-8 4v4l4-2Z',archive:'M3 4h8v7H3Zm10 0h8v7h-8ZM3 13h8v7H3Zm10 0h8v7h-8Z',saved:'M12 21 3.5 12.5C-2 6.5 7-1 12 6c5-7 14 .5 8.5 6.5Z',settings:'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18m0 5a4 4 0 1 0 0 8 4 4 0 0 0 0-8'};
     var svg=document.createElementNS('http://www.w3.org/2000/svg','svg');svg.setAttribute('viewBox','0 0 24 24');svg.setAttribute('aria-hidden','true');svg.setAttribute('class','menu-icon');var path=document.createElementNS(svg.namespaceURI,'path');path.setAttribute('d',paths[name]||paths.home);path.setAttribute('fill','none');path.setAttribute('stroke','currentColor');path.setAttribute('stroke-width','1.7');path.setAttribute('stroke-linejoin','round');path.setAttribute('stroke-linecap','round');svg.appendChild(path);return svg;
   }
-  // Official F1 catalogue photography is a visual fallback, never a LIVE claim.
-  var homePhotoDefaults=[
-    '1000010477-893be8b8-b466-4267-842d-a8cccb0bfd66/landscape_hero_web',
-    '1000010335-95e0054f-da97-47ec-a3ce-ae97303a2a55/landscape_web',
-    '1000008922-59e84d3b-5ea5-4558-b883-c5e33ceb8be2/landscape_web',
-    '1000007752-6d25b375-9ad5-494b-ad3b-907440fa1d0a/landscape_web',
-    '1000006884-a5803bc5-19fb-4bd7-b94a-0bc203ca1eb9/landscape_web'
-  ];
-  function homePhoto(raw,fallback){return Discovery.picture(raw&&raw.image)||Discovery.picture(homePhotoDefaults[fallback]);}
+  // Public catalogue artwork only: no account details or fixed image IDs.
+  var homePhotos;try{homePhotos=Discovery.artwork(window.localStorage);}catch(_){homePhotos=Discovery.artwork(null);}
+  function homePhoto(raw,fallback){return Discovery.picture(raw&&raw.image)||homePhotos.pick(fallback);}
   function setHomePhoto(parent,source,large){
     var url=Discovery.picture(source),old=parent&&parent.querySelector('.content-image');if(!parent||!url||old&&old.getAttribute('data-artwork')===url)return;
     if(old)old.remove();imageArtwork(parent,url,large);
   }
   function refreshHomePhotos(main,data){
-    data=data||{};var state=localStore.state(),sessions=data.sessions||[],live=(data.live||[]).concat(sessions.filter(function(i){return i.live;})),photos=[
+    data=data||{};var state=localStore.state(),sessions=data.sessions||[],live=(data.live||[]).concat(sessions.filter(function(i){return i.live;}));
+    homePhotos.observe('weekend',live.concat(data.meeting?[data.meeting]:[],sessions));homePhotos.observe('editorial',main.homeEditorialPhotos||[]);
+    var hero=main.querySelector('.tv-hero'),model=hero&&hero.homeModel;if(model)setHomePhoto(hero,homePhoto(model.photo?{image:model.photo}:model.continuing||model.feature,0),true);
+    var photos=[
       homePhoto(live[0]||data.meeting,0),homePhoto(data.meeting||sessions[0],1),homePhoto((main.homeEditorialPhotos||[])[0],2),homePhoto(state.favorites[0],3),homePhoto(state.progress[0],4)
     ];
     ['discover-live','discover-library','discover-editorial','discover-saved','discover-history'].forEach(function(key,index){var card=main.querySelector('[data-focus-key="'+key+'"]');if(card)setHomePhoto(card.querySelector('.card-visual'),photos[index],false);});
@@ -5577,7 +5585,7 @@ window.ApexProtectionProbe = {
   function updateHomeFeature(main,data){
     var hero=main.querySelector('.tv-hero');if(!hero||!hero.homeModel)return;var model=hero.homeModel,item=(data.sessions||[]).filter(function(i){return i.live;})[0]||(data.live||[]).filter(function(i){return (!i.series||/formula\s*1|^f1$/i.test(i.series))&&!/\bkids\b/i.test(i.title);})[0]||model.continuing||data.meeting;if(!item)return;var available=(data.sessions||[]).filter(function(i){return i.playable&&i.state==='replay';}),latest=available[available.length-1],nextSession=(data.sessions||[]).filter(function(i){return i.state==='upcoming';})[0];model.feature=item===data.meeting?(latest||null):item;
     I18n.setText(model.title, compactTitle(item.kind==='video'?item.title:item.subtitle||item.title));I18n.setText(model.eyebrow, item.live?'DABAR TIESIOGIAI':model.continuing===item?'TĘSK TEN, KUR SUSTOJAI':'FORMULA 1 · ŠIS SAVAITGALIS');I18n.setText(model.description, item.live?'Pagrindinė transliacija, lenktynininkų kameros ir tavo pasirinktas garsas.':model.continuing===item?'Išsaugota vieta · '+UX.time(item.position):'Visos sesijos vienoje vietoje. Laikai rodomi tavo televizoriaus laiko juostoje.');I18n.setText(model.watch, item.live?'Žiūrėti tiesiogiai':item.kind==='video'?'Tęsti žiūrėjimą':latest?'Žiūrėti '+(/qualifying|kvalifikacija/i.test(latest.title)?'kvalifikaciją':/sprint/i.test(latest.title)?'sprintą':/race|grand prix|lenktyn/i.test(latest.title)?'lenktynes':'paskutinę sesiją'):'Žiūrėti įrašus');if(item===data.meeting&&nextSession)I18n.setText(model.description, 'Artimiausia sesija · '+Discovery.localTime(nextSession.start,true)+' · vietos laiku.');
-    var artwork=Discovery.picture(item.image)||homePhoto(data.meeting,0);setHomePhoto(hero,artwork,true);refreshHomePhotos(main,data);
+    model.photo=Discovery.picture(item.image)||Discovery.picture(data.meeting&&data.meeting.image);refreshHomePhotos(main,data);
   }
   function renderWeekend(main){
     var loading=node('p','Gaunamas varžybų savaitgalis…','weekend-loading loading-state');main.appendChild(loading);if(weekendData){loading.remove();renderWeekendPanel(main,weekendData,false);}loadWeekend(main,false,true);liveTimer=setInterval(function(){loadWeekend(main,false,false);},30000);
@@ -5642,7 +5650,7 @@ window.ApexProtectionProbe = {
     setHomePhoto(hero,homePhoto(feature,0),true);refreshHomePhotos(main,weekendData);renderHeroSchedule(main,weekendData);
     if(signedIn)renderHomeEditorial(main);
     rail(main,'Neseniai atidaryti',state.recent,'recent');rail(main,'Tavo mėgstami įrašai',state.favorites,'saved');
-    if(signedIn){if(weekendData){renderWeekendPanel(main,weekendData,true);updateHomeFeature(main,weekendData);}loadWeekend(main,true,false);liveTimer=setInterval(function(){loadWeekend(main,true,false);},30000);}
+    if(signedIn){if(weekendData){renderWeekendPanel(main,weekendData,true);updateHomeFeature(main,weekendData);}loadWeekend(main,true,false);liveTimer=setInterval(function(){loadWeekend(main,true,false);if(!playing&&!modal&&!document.hidden&&document.contains(main)&&main.refreshHomeEditorial)main.refreshHomeEditorial();},30000);}
   }
 
   var Editorial=window.ApexEditorial,editorialCache={},editorialPending={};
@@ -5665,8 +5673,9 @@ window.ApexProtectionProbe = {
   }
   function renderHomeEditorial(main){var view=current,section=node('section','','home-section editorial-home'),heading=node('div','','section-heading');heading.appendChild(node('h2',setupText('Apžvalgos','Highlights')));heading.appendChild(focusKey(button(setupText('Apžvalgos ir laidos ›','Highlights & shows ›'),function(){openEditorial('highlights');},'section-more'),'home-editorial-all'));section.appendChild(heading);var host=node('div','','editorial-home-results');section.appendChild(host);main.appendChild(section);
     function active(){return current===view&&!playing&&document.contains(section);}
-    function paint(data){if(!active()||host.contains(document.activeElement))return;host.textContent='';var cards=node('div','','tiles');data.items.slice(0,4).forEach(function(i){cards.appendChild(itemCard(i,'home-highlight-'+i.id));});if(data.items.length)host.appendChild(cards);else host.appendChild(node('p',setupText('Apžvalgas ir laidas rasi atvėręs skiltį.','Open Highlights & shows to browse more.'),'settings-note'));main.homeEditorialPhotos=data.items;refreshHomePhotos(main,weekendData);}
-    var saved=editorialCache.highlights;if(saved)paint(saved);else editorialLoading(host,true);getEditorial('highlights',false).then(paint,function(){if(!active())return;host.textContent='';host.appendChild(node('p',setupText('Apžvalgų įkelti nepavyko. Atverk skiltį ir bandyk dar kartą.','Highlights could not load. Open the section to retry.'),'settings-note'));});
+    function paint(data){if(!active())return;main.homeEditorialPhotos=data.items;refreshHomePhotos(main,weekendData);if(host.contains(document.activeElement))return;host.textContent='';var cards=node('div','','tiles');data.items.slice(0,4).forEach(function(i){cards.appendChild(itemCard(i,'home-highlight-'+i.id));});if(data.items.length)host.appendChild(cards);else host.appendChild(node('p',setupText('Apžvalgas ir laidas rasi atvėręs skiltį.','Open Highlights & shows to browse more.'),'settings-note'));}
+    var attempted=0;main.refreshHomeEditorial=function(){if(!active()||modal||document.hidden||Date.now()-attempted<Editorial.TTL)return;attempted=Date.now();getEditorial('highlights',false).then(paint,function(){if(!active()||host.querySelector('.tiles')||host.contains(document.activeElement))return;host.textContent='';host.appendChild(node('p',setupText('Apžvalgų įkelti nepavyko. Atverk skiltį ir bandyk dar kartą.','Highlights could not load. Open the section to retry.'),'settings-note'));});};
+    var saved=editorialCache.highlights;if(saved)paint(saved);else editorialLoading(host,true);main.refreshHomeEditorial();
   }
 
   function renderVideoDetails(main,item) {
