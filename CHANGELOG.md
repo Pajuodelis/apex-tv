@@ -2,6 +2,7 @@
 
 ## 0.5.11 — local candidate, not published
 
+- Refine the four player actions into rounded capsules with monochrome vector icons and a single clear white focus state. Pause/play artwork follows playback state, using static layers without blur, scaling or emoji.
 - Organize Settings into Account, Playback, Display & language, Privacy and Help & updates. Render one short pane at a time, preserve category focus, and return from a pane to its category with Back. Existing sign-in, confirmation, preferences and diagnostic actions are retained.
 - Remote category navigation separates focus from selection; Down opens the focused category and enters its controls. Restore textarea focus as well as buttons and inputs.
 - Replace fixed fallback image IDs with a bounded TV-local cache of public artwork URLs from current weekend and recent highlights metadata. Refresh recent highlights on the idle home screen every ten minutes; preserve valid cached choices on empty/error responses and across restarts. No account data is stored in the artwork cache.

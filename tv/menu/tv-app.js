@@ -6580,7 +6580,7 @@ window.ApexProtectionProbe = {
     if(restorePause(m))m.paused=true;lastMetrics=m;
     if(m.paused&&overlay.hidden&&!overlayDismissed)showOverlay();
     if(!overlay.hidden){
-      updateViewControls(m);var pause=document.getElementById('play-pause');UI.text(pause,m.paused?'Tęsti':'Pauzė');UI.attr(pause,'aria-label',I18n.text(m.paused?'Tęsti vaizdą':'Sustabdyti vaizdą'));
+      updateViewControls(m);var pause=document.getElementById('play-pause');UI.text(pause,m.paused?'Tęsti':'Pauzė');UI.attr(pause,'aria-label',I18n.text(m.paused?'Tęsti vaizdą':'Sustabdyti vaizdą'));UI.attr(pause,'data-paused',String(m.paused));
       var timeline=document.getElementById('player-timeline'),length=live&&liveRange?liveRange.duration:m.duration,progress=live&&liveRange?m.position-liveRange.start:m.position,canScrub=live?Boolean(liveRange):m.duration>1;
       UI.set(timeline,'hidden',!canScrub);UI.set(timeline,'tabIndex',canScrub&&!viewBusy?0:-1);UI.attr(timeline,'aria-disabled',String(!canScrub||viewBusy));
       if(typeof scrubber!=='undefined'&&scrubber.active()){scrubber.sync(m.position);paintScrub();}
