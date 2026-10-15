@@ -3009,8 +3009,16 @@ return{controller:controller};
     return{search:function(q){return search(client,q);},weekend:async function(){var values=await Promise.all([loadProgram(),client.live()]),calendar=values[0],live=values[1],now=clock();return{meeting:calendar.meeting,sessions:program(calendar.items,now,live,calendar.meeting),live:live,at:now,timeZone:'Europe/Vilnius'};},clear:function(){cached=null;}};
   }
   function localTime(raw,day){var value=date(raw);if(!value)return 'Laikas nepateiktas';try{return new Intl.DateTimeFormat(root.ApexI18n?root.ApexI18n.locale():'lt-LT',{timeZone:root.ApexI18n?root.ApexI18n.timeZone():'Europe/Vilnius',weekday:day?'short':undefined,month:day?'short':undefined,day:day?'numeric':undefined,hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date(value));}catch(_){return new Date(value).toLocaleString(root.ApexI18n?root.ApexI18n.locale():'lt-LT');}}
-  return{normalize:normalize,picture:picture,date:date,query:query,search:search,chooseMeeting:chooseMeeting,program:program,create:create,localTime:localTime};
+  function upcoming(data,now){
+    now=Number.isFinite(now)?now:Date.now();var seen={};
+    return ((data&&data.live)||[]).concat((data&&data.sessions)||[]).filter(function(i){
+      if(!i||i.series&&!/formula\s*1|^f1$/i.test(i.series)||/\bkids\b/i.test(i.title||''))return false;
+      var start=date(i.start),end=date(i.end),key=String(i.id||start+':'+clean(i.title));if(seen[key]||!(i.live?(!end||end>now):start>now))return false;seen[key]=true;return true;
+    }).sort(function(a,b){return Number(Boolean(b.live))-Number(Boolean(a.live))||date(a.start)-date(b.start);}).slice(0,4);
+  }
+  return{normalize:normalize,picture:picture,date:date,query:query,search:search,chooseMeeting:chooseMeeting,program:program,create:create,localTime:localTime,upcoming:upcoming};
 }));
+
 ;
 /* F1 editorial catalogue. Public metadata only; playback and DRM are unchanged. */
 (function(root,factory){var api=factory(typeof module==='object'&&module.exports?require('./discovery.js'):root.ApexDiscovery);if(typeof module==='object'&&module.exports)module.exports=api;else root.ApexEditorial=api;}(typeof window!=='undefined'?window:globalThis,function(D){
@@ -5516,6 +5524,25 @@ window.ApexProtectionProbe = {
     var paths={home:'M3 10.5 12 3l9 7.5V21h-6v-7H9v7H3Z',search:'M10 3a7 7 0 1 0 0 14 7 7 0 0 0 0-14m5 12 6 6',live:'M4 4h16v16H4Zm5 3v10l8-5Z',weekend:'M4 5h16v16H4ZM7 2v6m10-6v6M4 10h16',editorial:'M3 4h18v16H3ZM3 9h18M7 4l4 5m3-5 4 5m-8 4v4l4-2Z',archive:'M3 4h8v7H3Zm10 0h8v7h-8ZM3 13h8v7H3Zm10 0h8v7h-8Z',saved:'M12 21 3.5 12.5C-2 6.5 7-1 12 6c5-7 14 .5 8.5 6.5Z',settings:'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18m0 5a4 4 0 1 0 0 8 4 4 0 0 0 0-8'};
     var svg=document.createElementNS('http://www.w3.org/2000/svg','svg');svg.setAttribute('viewBox','0 0 24 24');svg.setAttribute('aria-hidden','true');svg.setAttribute('class','menu-icon');var path=document.createElementNS(svg.namespaceURI,'path');path.setAttribute('d',paths[name]||paths.home);path.setAttribute('fill','none');path.setAttribute('stroke','currentColor');path.setAttribute('stroke-width','1.7');path.setAttribute('stroke-linejoin','round');path.setAttribute('stroke-linecap','round');svg.appendChild(path);return svg;
   }
+  // Official F1 catalogue photography is a visual fallback, never a LIVE claim.
+  var homePhotoDefaults=[
+    '1000010477-893be8b8-b466-4267-842d-a8cccb0bfd66/landscape_hero_web',
+    '1000010335-95e0054f-da97-47ec-a3ce-ae97303a2a55/landscape_web',
+    '1000008922-59e84d3b-5ea5-4558-b883-c5e33ceb8be2/landscape_web',
+    '1000007752-6d25b375-9ad5-494b-ad3b-907440fa1d0a/landscape_web',
+    '1000006884-a5803bc5-19fb-4bd7-b94a-0bc203ca1eb9/landscape_web'
+  ];
+  function homePhoto(raw,fallback){return Discovery.picture(raw&&raw.image)||Discovery.picture(homePhotoDefaults[fallback]);}
+  function setHomePhoto(parent,source,large){
+    var url=Discovery.picture(source),old=parent&&parent.querySelector('.content-image');if(!parent||!url||old&&old.getAttribute('data-artwork')===url)return;
+    if(old)old.remove();imageArtwork(parent,url,large);
+  }
+  function refreshHomePhotos(main,data){
+    data=data||{};var state=localStore.state(),sessions=data.sessions||[],live=(data.live||[]).concat(sessions.filter(function(i){return i.live;})),photos=[
+      homePhoto(live[0]||data.meeting,0),homePhoto(data.meeting||sessions[0],1),homePhoto((main.homeEditorialPhotos||[])[0],2),homePhoto(state.favorites[0],3),homePhoto(state.progress[0],4)
+    ];
+    ['discover-live','discover-library','discover-editorial','discover-saved','discover-history'].forEach(function(key,index){var card=main.querySelector('[data-focus-key="'+key+'"]');if(card)setHomePhoto(card.querySelector('.card-visual'),photos[index],false);});
+  }
   function imageArtwork(parent,source,large){
     var url=Discovery.picture(source);if(!url)return false;
     var img=node('img','','content-image');img.alt='';img.setAttribute('aria-hidden','true');img.setAttribute('data-artwork',url);img.decoding='async';
@@ -5524,7 +5551,17 @@ window.ApexProtectionProbe = {
   }
   function compactTitle(raw){return String(raw||'').replace(/^FORMULA 1\s+/i,'').replace(/\s+(?:GRAND PRIX)\s+((?:19|20)\d{2})$/i,' GP $1');}
   function sessionTitle(raw){return String(raw||'').replace(/^\d{4}\s+.*?\sGP\s*[-–]\s*/i,'').replace(/^\d{4}\s+.+\sGrand Prix$/i,'Race').replace(/\bRace\b/gi,'Lenktynės').replace(/\bSprint Qualifying\b/gi,'Sprinto kvalifikacija').replace(/Qualifying/gi,'Kvalifikacija').replace(/Practice\s*(\d)/gi,'Treniruotė $1').replace(/\bSprint\b/gi,'Sprintas').replace(/Grand Prix/gi,'Lenktynės');}
+  function renderHeroSchedule(main,data){
+    var hero=main.querySelector('.tv-hero');if(!hero)return;var previous=hero.querySelector('.hero-schedule');if(previous&&previous.contains(document.activeElement))return;if(previous)previous.remove();
+    var panel=node('section','','hero-schedule');panel.setAttribute('aria-label',setupText('Artimiausios F1 sesijos','Upcoming F1 sessions'));panel.appendChild(node('span',setupText('ARTIMIAUSIA TRASOJE','COMING UP'),'eyebrow'));panel.appendChild(node('h2',data&&data.meeting?compactTitle(data.meeting.subtitle||data.meeting.title):setupText('Lenktynių savaitgalis','Race weekend')));
+    var items=Discovery.upcoming(data,Date.now());
+    if(items.length){var list=node('div','','hero-schedule-list');items.forEach(function(item){
+      var row=focusKey(button('',function(){if(item.live)openItem(item);else showTab('weekend','Varžybų savaitgalis');},'hero-session'),'hero-session-'+item.id);row.appendChild(node('span',item.live?setupText('● TIESIOGIAI','● LIVE'):Discovery.localTime(item.start,true),'hero-session-time'));row.appendChild(node('strong',sessionTitle(item.title)));list.appendChild(row);
+    });panel.appendChild(list);}else panel.appendChild(node('p',setupText('Artimiausių sesijų laikai atsiras, kai juos paskelbs F1.','Upcoming session times will appear when F1 publishes them.'),'hero-schedule-empty'));
+    panel.appendChild(node('p',setupText('Laikai tavo laiko juostoje','Times in your time zone'),'hero-schedule-zone'));hero.appendChild(panel);
+  }
   function renderWeekendPanel(main,data,home){
+    if(home){renderHeroSchedule(main,data);return;}
     var old=main.querySelector('.weekend-panel');if(old&&old.contains(document.activeElement))return;if(old)old.remove();var section=node('section','','weekend-panel home-section'),heading=node('div','','section-heading');heading.appendChild(node('h2',home?'Šis varžybų savaitgalis':compactTitle(data.meeting.title)));var zone=node('span','VIETINIS LAIKAS');heading.appendChild(zone);
     if(home)heading.appendChild(focusKey(button('Visas savaitgalis ›',function(){showTab('weekend','Varžybų savaitgalis');},'section-more'),'weekend-all'));section.appendChild(heading);
     if(home)section.appendChild(node('p',compactTitle(data.meeting.title),'weekend-meeting'));
@@ -5540,7 +5577,7 @@ window.ApexProtectionProbe = {
   function updateHomeFeature(main,data){
     var hero=main.querySelector('.tv-hero');if(!hero||!hero.homeModel)return;var model=hero.homeModel,item=(data.sessions||[]).filter(function(i){return i.live;})[0]||(data.live||[]).filter(function(i){return (!i.series||/formula\s*1|^f1$/i.test(i.series))&&!/\bkids\b/i.test(i.title);})[0]||model.continuing||data.meeting;if(!item)return;var available=(data.sessions||[]).filter(function(i){return i.playable&&i.state==='replay';}),latest=available[available.length-1],nextSession=(data.sessions||[]).filter(function(i){return i.state==='upcoming';})[0];model.feature=item===data.meeting?(latest||null):item;
     I18n.setText(model.title, compactTitle(item.kind==='video'?item.title:item.subtitle||item.title));I18n.setText(model.eyebrow, item.live?'DABAR TIESIOGIAI':model.continuing===item?'TĘSK TEN, KUR SUSTOJAI':'FORMULA 1 · ŠIS SAVAITGALIS');I18n.setText(model.description, item.live?'Pagrindinė transliacija, lenktynininkų kameros ir tavo pasirinktas garsas.':model.continuing===item?'Išsaugota vieta · '+UX.time(item.position):'Visos sesijos vienoje vietoje. Laikai rodomi tavo televizoriaus laiko juostoje.');I18n.setText(model.watch, item.live?'Žiūrėti tiesiogiai':item.kind==='video'?'Tęsti žiūrėjimą':latest?'Žiūrėti '+(/qualifying|kvalifikacija/i.test(latest.title)?'kvalifikaciją':/sprint/i.test(latest.title)?'sprintą':/race|grand prix|lenktyn/i.test(latest.title)?'lenktynes':'paskutinę sesiją'):'Žiūrėti įrašus');if(item===data.meeting&&nextSession)I18n.setText(model.description, 'Artimiausia sesija · '+Discovery.localTime(nextSession.start,true)+' · vietos laiku.');
-    var artwork=Discovery.picture(item.image||(item===data.meeting?data.meeting.image:'')),old=hero.querySelector('.content-image');if(artwork&&(!old||old.getAttribute('data-artwork')!==artwork)){if(old)old.remove();imageArtwork(hero,artwork,true);}else if(!artwork&&old){old.remove();var fallback=hero.querySelector('.graphic-art');if(fallback)fallback.style.visibility='';}
+    var artwork=Discovery.picture(item.image)||homePhoto(data.meeting,0);setHomePhoto(hero,artwork,true);refreshHomePhotos(main,data);
   }
   function renderWeekend(main){
     var loading=node('p','Gaunamas varžybų savaitgalis…','weekend-loading loading-state');main.appendChild(loading);if(weekendData){loading.remove();renderWeekendPanel(main,weekendData,false);}loadWeekend(main,false,true);liveTimer=setInterval(function(){loadWeekend(main,false,false);},30000);
@@ -5602,6 +5639,7 @@ window.ApexProtectionProbe = {
     cards.appendChild(contentCard(editorialTitle(),setupText('Apžvalgos, Race in 30, laidos ir dokumentika','Highlights, Race in 30, shows and documentaries'),function(){openEditorial('highlights');},{key:'discover-editorial',art:'collection',year:'F1 TV'}));
     cards.appendChild(contentCard('Mano sąrašas','Mėgstami įrašai: '+state.favorites.length,function(){showTab('saved','Mano sąrašas');},{key:'discover-saved',art:'collection',year:'♥'}));
     cards.appendChild(contentCard('Žiūrėjimo istorija','Žiūrėti įrašai: '+state.progress.length,function(){showTab('history','Žiūrėjimo istorija');},{key:'discover-history',art:'collection',year:'↶'}));section.appendChild(cards);main.appendChild(section);
+    setHomePhoto(hero,homePhoto(feature,0),true);refreshHomePhotos(main,weekendData);renderHeroSchedule(main,weekendData);
     if(signedIn)renderHomeEditorial(main);
     rail(main,'Neseniai atidaryti',state.recent,'recent');rail(main,'Tavo mėgstami įrašai',state.favorites,'saved');
     if(signedIn){if(weekendData){renderWeekendPanel(main,weekendData,true);updateHomeFeature(main,weekendData);}loadWeekend(main,true,false);liveTimer=setInterval(function(){loadWeekend(main,true,false);},30000);}
@@ -5627,7 +5665,7 @@ window.ApexProtectionProbe = {
   }
   function renderHomeEditorial(main){var view=current,section=node('section','','home-section editorial-home'),heading=node('div','','section-heading');heading.appendChild(node('h2',setupText('Apžvalgos','Highlights')));heading.appendChild(focusKey(button(setupText('Apžvalgos ir laidos ›','Highlights & shows ›'),function(){openEditorial('highlights');},'section-more'),'home-editorial-all'));section.appendChild(heading);var host=node('div','','editorial-home-results');section.appendChild(host);main.appendChild(section);
     function active(){return current===view&&!playing&&document.contains(section);}
-    function paint(data){if(!active()||host.contains(document.activeElement))return;host.textContent='';var cards=node('div','','tiles');data.items.slice(0,4).forEach(function(i){cards.appendChild(itemCard(i,'home-highlight-'+i.id));});if(data.items.length)host.appendChild(cards);else host.appendChild(node('p',setupText('Apžvalgas ir laidas rasi atvėręs skiltį.','Open Highlights & shows to browse more.'),'settings-note'));}
+    function paint(data){if(!active()||host.contains(document.activeElement))return;host.textContent='';var cards=node('div','','tiles');data.items.slice(0,4).forEach(function(i){cards.appendChild(itemCard(i,'home-highlight-'+i.id));});if(data.items.length)host.appendChild(cards);else host.appendChild(node('p',setupText('Apžvalgas ir laidas rasi atvėręs skiltį.','Open Highlights & shows to browse more.'),'settings-note'));main.homeEditorialPhotos=data.items;refreshHomePhotos(main,weekendData);}
     var saved=editorialCache.highlights;if(saved)paint(saved);else editorialLoading(host,true);getEditorial('highlights',false).then(paint,function(){if(!active())return;host.textContent='';host.appendChild(node('p',setupText('Apžvalgų įkelti nepavyko. Atverk skiltį ir bandyk dar kartą.','Highlights could not load. Open the section to retry.'),'settings-note'));});
   }
 
@@ -6593,7 +6631,8 @@ window.ApexProtectionProbe = {
       else if(key===40){if(!horizontal&&Math.floor(index/columns)<Math.floor((cards.length-1)/columns))winner=cards[Math.min(index+columns,cards.length-1)];else{var group=parent.closest('.home-section'),next=group&&group.nextElementSibling;winner=next&&next.querySelector('.tiles button,.schedule-row:not(:disabled),.section-more')||root.querySelector('.catalog-pager button:not(:disabled)')||root.querySelector('.footer-help');}}
       if(winner)winner.focus();return;
     }
-    if(parent&&parent.classList.contains('hero-actions')){var actions=parent.children,ai=Array.prototype.indexOf.call(actions,active);if(key===37){if(ai>0)winner=actions[ai-1];else{current.sidebarReturn=active.getAttribute('data-focus-key');winner=nav.querySelector('.selected');}}else if(key===39&&ai+1<actions.length)winner=actions[ai+1];else if(key===38)winner=nav.querySelector('.selected');else if(key===40)winner=root.querySelector('.home-section .tiles button,.weekend-panel button:not(:disabled)');if(winner)winner.focus();return;}
+    if(parent&&parent.classList.contains('hero-schedule-list')){var sessions=parent.children,si=Array.prototype.indexOf.call(sessions,active);if(key===37)winner=root.querySelector('.hero-actions button');else if(key===38&&si>0)winner=sessions[si-1];else if(key===40)winner=si+1<sessions.length?sessions[si+1]:root.querySelector('.discovery-section .tile');if(winner)winner.focus();return;}
+    if(parent&&parent.classList.contains('hero-actions')){var actions=parent.children,ai=Array.prototype.indexOf.call(actions,active);if(key===37){if(ai>0)winner=actions[ai-1];else{current.sidebarReturn=active.getAttribute('data-focus-key');winner=nav.querySelector('.selected');}}else if(key===39)winner=ai+1<actions.length?actions[ai+1]:root.querySelector('.hero-session');else if(key===38)winner=nav.querySelector('.selected');else if(key===40)winner=root.querySelector('.home-section .tiles button,.weekend-panel button:not(:disabled)');if(winner)winner.focus();return;}
     winner=focusSpatial(active,key);
     if(!winner&&key===37){current.sidebarReturn=active.getAttribute('data-focus-key');winner=nav.querySelector('.selected');}if(winner)winner.focus();
   }

@@ -31,5 +31,12 @@
     return{search:function(q){return search(client,q);},weekend:async function(){var values=await Promise.all([loadProgram(),client.live()]),calendar=values[0],live=values[1],now=clock();return{meeting:calendar.meeting,sessions:program(calendar.items,now,live,calendar.meeting),live:live,at:now,timeZone:'Europe/Vilnius'};},clear:function(){cached=null;}};
   }
   function localTime(raw,day){var value=date(raw);if(!value)return 'Laikas nepateiktas';try{return new Intl.DateTimeFormat(root.ApexI18n?root.ApexI18n.locale():'lt-LT',{timeZone:root.ApexI18n?root.ApexI18n.timeZone():'Europe/Vilnius',weekday:day?'short':undefined,month:day?'short':undefined,day:day?'numeric':undefined,hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date(value));}catch(_){return new Date(value).toLocaleString(root.ApexI18n?root.ApexI18n.locale():'lt-LT');}}
-  return{normalize:normalize,picture:picture,date:date,query:query,search:search,chooseMeeting:chooseMeeting,program:program,create:create,localTime:localTime};
+  function upcoming(data,now){
+    now=Number.isFinite(now)?now:Date.now();var seen={};
+    return ((data&&data.live)||[]).concat((data&&data.sessions)||[]).filter(function(i){
+      if(!i||i.series&&!/formula\s*1|^f1$/i.test(i.series)||/\bkids\b/i.test(i.title||''))return false;
+      var start=date(i.start),end=date(i.end),key=String(i.id||start+':'+clean(i.title));if(seen[key]||!(i.live?(!end||end>now):start>now))return false;seen[key]=true;return true;
+    }).sort(function(a,b){return Number(Boolean(b.live))-Number(Boolean(a.live))||date(a.start)-date(b.start);}).slice(0,4);
+  }
+  return{normalize:normalize,picture:picture,date:date,query:query,search:search,chooseMeeting:chooseMeeting,program:program,create:create,localTime:localTime,upcoming:upcoming};
 }));
