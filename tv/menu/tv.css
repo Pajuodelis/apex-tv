@@ -206,3 +206,42 @@ body.high-contrast .tv-login.login-panel{background:#000;border-color:#aaa}body.
 #player-overlay .player-help{font-size:16px;line-height:1.5;color:#b8b8c4;margin:18px 0 0;white-space:normal}
 #player-timeline{height:44px}#player-timeline:before,#player-timeline>.scrub-fill{top:19px}#player-timeline>.scrub-marker{top:22px}
 @media(max-width:1400px){#player-overlay .player-help{font-size:14px}#player-overlay #play-pause{min-width:125px}}
+
+/* Cinema home: generous spacing, quiet chrome and static TV-friendly layers. */
+.tv-shell{padding:40px 64px 30px 156px;background:#0b0b0e}
+.tv-header.tv-sidebar{left:24px;top:40px;bottom:40px;width:88px;padding:18px 10px;background:#161619;border-color:#26262c;border-radius:28px}
+.tv-sidebar:focus-within{width:260px;background:#1d1d22}
+.tv-sidebar .tv-nav button{border-radius:16px;color:#9e9ea9}
+.tv-sidebar .tv-nav button.selected{background:#303036;color:#fff}
+.tv-sidebar .tv-nav button:focus{background:#f5f5f7;color:#151518}
+.tv-sidebar .account-avatar{background:#303037;border-color:#45454e}
+.tv-home .tv-hero{height:498px;border:0;border-radius:28px;background:#17151d}
+.tv-home .tv-hero .hero-copy{padding:54px 58px;width:74%}
+.tv-home .tv-hero .hero-copy h1{font-size:68px;line-height:1.04;letter-spacing:-2.6px;max-width:920px}
+.tv-home .hero-copy>.eyebrow{font-size:13px;letter-spacing:2.4px;color:#c5c5d0;margin-bottom:12px}
+.tv-home .tv-main .hero-description,.tv-home .hero-description{font-size:23px;line-height:1.5;max-width:650px;color:#b7b7c4;margin-top:18px}
+.tv-home .hero-actions{margin-top:29px;display:flex;align-items:center}
+.tv-home .hero-actions button{font-size:21px;min-height:59px;border-radius:16px;padding:17px 27px}
+.tv-home .hero-actions .primary-button{background:#f5f5f7;color:#111115;border-color:#f5f5f7}
+.tv-home .hero-actions .secondary-button{background:#ffffff12;border:1px solid #ffffff20;color:#eeeef4}
+.tv-home .hero-actions button:focus{outline-width:2px;outline-offset:5px}
+.tv-home .tv-hero>.graphic-art{background:linear-gradient(115deg,#17141e 5%,#242031 55%,#663a40 100%);align-items:flex-end;padding-right:11%}
+.tv-home .tv-hero>.graphic-art .graphic-title{font-size:220px;letter-spacing:-16px;color:#ffffffdb;line-height:.95}
+.tv-home .tv-hero>.graphic-art .graphic-subtitle{font-size:12px;letter-spacing:5px;margin-right:9px;margin-top:24px;color:#e4ced6}
+.tv-home .tv-hero>.graphic-art .race-lines{stroke:#efc4bd30;stroke-width:1.5}
+.tv-home .tv-hero .hero-shade{background:linear-gradient(90deg,#101015 0%,#101015eb 28%,#10101550 60%,#10101505 100%),linear-gradient(0deg,#10101550,transparent 60%)}
+.home-section{margin-top:34px}.section-heading{margin-bottom:18px}.section-heading h2{font-size:28px;letter-spacing:-.7px;font-weight:600}
+.home-section .home-tiles{grid-template-columns:repeat(5,minmax(0,1fr));grid-gap:22px}
+.home-section .home-tiles .card-visual{height:152px;border-radius:18px;border-color:#ffffff0d}
+.discovery-section .graphic-art{background:linear-gradient(125deg,#34313e,#24232d)}
+.discovery-section .live-art{background:linear-gradient(125deg,#77444d,#38242f)}
+.discovery-section .graphic-title{font-size:50px;letter-spacing:-2px}
+.discovery-section .graphic-subtitle{font-size:8px;letter-spacing:2px}
+.discovery-section .card-badge{background:transparent;border:0;padding:0;color:#ffffffa6;font-size:10px;left:16px;top:15px}
+.discovery-section .card-open{width:28px;height:28px;right:14px;bottom:13px;background:#ffffffdf}
+.card-caption{padding:16px 3px 4px}.tile strong{font-size:21px;letter-spacing:-.4px}.tile small{font-size:15px;color:#8f8f9d;margin-top:7px}
+.card-visual{border-radius:18px}.tile:focus .card-visual{outline:3px solid #f5f5f7;outline-offset:5px}.tile:focus .card-caption strong{color:#fff}
+.tv-footer{color:#72727f;margin-top:27px}.remote-key{background:#202025;border-color:#34343d;color:#a9a9b6}.footer-version{color:#60606e}
+body.high-contrast .tv-header.tv-sidebar,body.high-contrast .tv-shell{background:#000}body.high-contrast .tile small{color:#fff}
+@media(max-width:1400px){.tv-shell{padding:28px 40px 24px 116px}.tv-header.tv-sidebar{left:22px;top:28px;bottom:28px;width:70px;padding:15px 7px}.tv-sidebar:focus-within{width:234px}.tv-home .tv-hero{height:380px;border-radius:23px}.tv-home .tv-hero .hero-copy{padding:35px 39px;width:76%}.tv-home .tv-hero .hero-copy h1{font-size:48px;letter-spacing:-1.7px}.tv-home .hero-copy>.eyebrow{font-size:11px;letter-spacing:1.8px}.tv-home .hero-description{font-size:19px;max-width:500px;margin-top:14px}.tv-home .hero-actions{margin-top:23px}.tv-home .hero-actions button{font-size:17px;min-height:51px;padding:14px 21px;border-radius:13px}.tv-home .tv-hero>.graphic-art .graphic-title{font-size:155px;letter-spacing:-11px}.tv-home .tv-hero>.graphic-art .graphic-subtitle{font-size:9px;letter-spacing:3px}.home-section{margin-top:28px}.section-heading h2{font-size:24px}.home-section .home-tiles{grid-gap:17px}.home-section .home-tiles .card-visual{height:115px;border-radius:14px}.discovery-section .graphic-title{font-size:37px}.discovery-section .graphic-subtitle{font-size:6px}.tile strong{font-size:18px}.tile small{font-size:13px}.card-caption{padding-top:13px}}
+@media(max-width:1000px){.tv-shell{padding:22px 27px 20px 94px}.tv-header.tv-sidebar{left:16px;top:22px;bottom:22px;width:58px;padding:12px 5px}.tv-sidebar:focus-within{width:215px}.tv-home .tv-hero{height:325px}.tv-home .tv-hero .hero-copy{padding:29px;width:84%}.tv-home .tv-hero .hero-copy h1{font-size:37px;letter-spacing:-1.2px}.tv-home .hero-description{font-size:16px;max-width:390px}.tv-home .hero-actions button{font-size:15px;min-height:45px;padding:12px 16px}.home-section .home-tiles{grid-template-columns:repeat(3,minmax(0,1fr))}.home-section .home-tiles .card-visual{height:119px}.tile strong{font-size:16px}.tile small{font-size:12px}}

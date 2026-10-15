@@ -2,6 +2,7 @@
 
 ## 0.5.11 — local candidate, not published
 
+- Refine the cinema home with a quiet sidebar, spacious feature panel, consistent rounded cards and a five-column discovery row at TV resolutions. Static gradients preserve a lightweight rendering path; smaller screens retain a three-column layout.
 - Coalesce dense remote arrow repeats into one focus action per animation frame, reuse menu geometry during shell scrolling, and follow the actual grid or horizontal shelf layout.
 - OK reveals player controls without pausing. Dedicated Play/Pause remains immediate. Left/right opens a timeline preview; OK confirms one seek, while Back cancels and hides controls.
 - Emphasize Pause, enlarge the timeline target and show concise English/Lithuanian remote hints. Controls hide after inactivity while playing, preserving paused and unconfirmed timeline selections.
