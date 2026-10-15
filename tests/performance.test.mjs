@@ -48,6 +48,12 @@ test('replacing search results prunes detached loads and observations without st
 test('spatial focus reuses geometry until scroll, resize, disabled state or layout changes',()=>{
  const handlers={},env={addEventListener:(name,fn)=>handlers[name]=fn};let invalidate,reads=0;env.MutationObserver=class{constructor(fn){invalidate=fn;}observe(){}};const list=Array.from({length:24},(_,i)=>({disabled:false,offsetParent:{},getBoundingClientRect(){reads++;return{left:i%4*100,top:Math.floor(i/4)*100,width:90,height:90};}}));const root={querySelectorAll:()=>list,addEventListener:(n,f)=>handlers[n]=f},move=UI.spatial(root,env);assert.equal(move(list[0],39),list[1]);assert.equal(reads,24);assert.equal(move(list[1],40),list[5]);assert.equal(reads,24);handlers.scroll();move(list[5],40);assert.equal(reads,48);list[9].disabled=true;invalidate();assert.notEqual(move(list[5],40),list[9]);assert.equal(reads,71);handlers.resize();move(list[5],39);assert.equal(reads,94);
 });
+
+test('100 fast catalogue replacements leave no old load timers and late callbacks cannot consume new slots',()=>{
+ const env=clock(),loader=UI.images(env,{contains:img=>!img.detached&&!img.removed}),late=[];
+ for(let cycle=0;cycle<100;cycle++){const pics=Array.from({length:8},image);pics.forEach((img,i)=>loader.add(img,'cycle-'+cycle+'-'+i,image(),true));env.run(0);assert.equal(pics.filter(i=>i.src).length,2);late.push(pics[0].onload);pics.forEach(i=>i.detached=true);loader.prune();assert.equal(env.tasks.size,0);}
+ const newest=Array.from({length:3},image);newest.forEach((img,i)=>loader.add(img,'new-'+i,image(),true));env.run(0);late.forEach(fn=>fn());assert.equal(newest.filter(i=>i.src).length,2);newest[0].onload();assert.equal(newest[2].src,'new-2');loader.reset();assert.equal(env.tasks.size,0);
+});
 test('reduced-motion and auto-quality reads preserve preferences without copying viewing history',()=>{
  const disk=new Map(),store=UX.store({getItem:k=>disk.get(k),setItem:(k,v)=>disk.set(k,v)});store.preference('reduceMotion',true);store.preference('autoQuality',false);assert.equal(store.getPreference('reduceMotion'),true);assert.equal(store.getPreference('autoQuality'),false);assert.equal(UX.store({getItem:k=>disk.get(k)}).getPreference('reduceMotion'),true);assert.equal(store.getPreference('__proto__'),undefined);
 });

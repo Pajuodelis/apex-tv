@@ -2,6 +2,7 @@
 
 ## 0.5.11 — local candidate, not published
 
+- Avoid repainting identical cached home highlights on menu entry and periodic refresh; prune detached artwork when that shelf actually changes. Stress tests cover 100 rapid catalogue replacements and late image callbacks.
 - Reuse unchanged home schedule DOM and a bounded cache of repeated English translations. Purge detached thumbnail work when replacing catalogue/search results, index visibility callbacks by image, and release stalled image loads after 15 seconds while retaining the concurrency limit of two.
 - Refine the four player actions into rounded capsules with monochrome vector icons and a single clear white focus state. Pause/play artwork follows playback state, using static layers without blur, scaling or emoji.
 - Organize Settings into Account, Playback, Display & language, Privacy and Help & updates. Render one short pane at a time, preserve category focus, and return from a pane to its category with Back. Existing sign-in, confirmation, preferences and diagnostic actions are retained.
