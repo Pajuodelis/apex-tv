@@ -2,7 +2,7 @@
 'use strict';
 var cfg=window.APEX_CONFIG,status=document.getElementById('boot-status'),server=ApexMenuCache.localServer(localStorage.getItem('apex-server')||cfg.server),active=false,updating=false;
 function report(event,message){if(!server)return;try{var q=new XMLHttpRequest();q.open('POST',server+'/api/diagnostics');q.setRequestHeader('X-Apex-Key',cfg.pairingKey);q.setRequestHeader('Content-Type','application/json');q.timeout=2000;q.send(JSON.stringify({event:event,source:'tv',revision:window.APEX_CONTEXT&&window.APEX_CONTEXT.revision,error:String(message||'').replace(/https?:\/\/\S+/g,'[adresas]').slice(0,180)}));}catch(_){}}
-function fail(message){status.textContent=message;document.getElementById('boot-fix').hidden=false;document.getElementById('boot-retry').focus();}
+function fail(message){document.getElementById("boot").className="boot-error";status.textContent=message;document.getElementById('boot-fix').hidden=false;document.getElementById('boot-retry').focus();}
 document.getElementById('boot-retry').onclick=function(){location.reload();};
 function load(tag,url){return new Promise(function(resolve,reject){var e=document.createElement(tag);if(tag==='link'){e.rel='stylesheet';e.href=url;}else e.src=url;e.onload=function(){resolve();};e.onerror=function(){reject(Error('Nepavyko įkelti TV išsaugoto meniu.'));};document.head.appendChild(e);});}
 function start(m,bundle){

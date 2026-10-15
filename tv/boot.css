@@ -1,1 +1,17 @@
 *{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;font-family:Arial,sans-serif;background:#101116;color:#f3f3f7}#boot{padding:7vh 7vw}.logo{font-size:40px;font-weight:800;letter-spacing:6px}.logo b{color:#ff5139}h1{font-size:40px;margin-top:70px}#boot-status{font-size:25px;color:#b5b8ca;max-width:1000px}#boot-fix{margin-top:45px}input,button{font-family:inherit;font-size:24px;padding:16px;border-radius:8px;border:2px solid #55596d;color:#fff;background:#282b38}input{display:block;width:600px;margin:20px 0}button:focus,input:focus{outline:4px solid #ff725f;outline-offset:5px}#av-player,#html-player{position:absolute;left:0;top:0;right:0;bottom:0;width:100%;height:100%;z-index:0;visibility:hidden}#html-player{object-fit:contain}#app,#boot{position:relative;z-index:2}[hidden]{display:none!important}body.playing{background:transparent}body.playing #av-player{visibility:visible}body.html-playing #html-player{visibility:visible}#player-overlay{position:absolute;left:0;right:0;bottom:0;padding:40px 5vw;background:linear-gradient(transparent,rgba(0,0,0,.94));z-index:4;font-size:22px}#player-title{font-size:30px;font-weight:700}.player-buttons button{margin:10px 20px 10px 0}
+/* Instant first paint: local text/CSS only, no minimum splash duration. */
+#boot{min-height:100vh;width:100%;display:flex;align-items:center;justify-content:center;padding:48px;text-align:center;background:radial-gradient(ellipse at 50% 43%,#1a1c25 0%,#101116 43%,#0b0c10 100%)}
+#boot .boot-content{width:100%;max-width:880px;animation:boot-appear 160ms ease-out}
+#boot h1.logo{margin:0;padding:0;font-size:78px;line-height:1.15;font-weight:700;letter-spacing:10px;color:#f5f5f7}
+#boot .logo b{font-weight:500;color:#b8bac6;letter-spacing:7px}
+#boot .boot-loader{position:relative;width:144px;height:3px;margin:39px auto 23px;overflow:hidden;border-radius:3px;background:#ffffff14}
+#boot .boot-loader span{display:block;width:48px;height:3px;border-radius:3px;background:#d5d7e2;transform:translateX(-48px);animation:boot-scan 1500ms ease-in-out infinite}
+#boot #boot-status{font-size:18px;line-height:1.5;font-weight:400;letter-spacing:.2px;color:#9296a6;margin:0 auto;max-width:780px;overflow-wrap:break-word}
+#boot #boot-fix{margin:27px auto 0;max-width:700px}#boot #boot-fix p{font-size:16px;line-height:1.5;color:#8e92a3;margin-top:22px}
+#boot #boot-retry{font-size:20px;font-weight:600;min-height:54px;padding:15px 26px;border:1px solid #ffffff26;border-radius:999px;background:#292b34;color:#f5f5f7}
+#boot #boot-retry:focus{background:#f5f5f7;color:#141418;outline:0;box-shadow:0 0 0 4px #ffffff22}
+#boot.boot-error .boot-loader{visibility:hidden}#boot.boot-error .boot-loader span{animation:none}#boot.boot-error #boot-status{color:#e1d3d1}
+@keyframes boot-appear{from{opacity:.65}to{opacity:1}}
+@keyframes boot-scan{from{transform:translateX(-48px)}to{transform:translateX(144px)}}
+@media(prefers-reduced-motion:reduce){#boot .boot-content,#boot .boot-loader span{animation:none}#boot .boot-loader span{transform:translateX(48px)}}
+@media(max-width:1400px){#boot h1.logo{font-size:60px;letter-spacing:8px}#boot #boot-status{font-size:16px}#boot .boot-loader{margin-top:30px;width:132px}}

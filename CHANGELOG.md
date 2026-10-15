@@ -2,6 +2,7 @@
 
 ## 0.5.11 — local candidate, not published
 
+- Center the startup wordmark on a quiet static backdrop with a small CSS-only loading indicator. No external assets or minimum display delay; reduced-motion media preferences disable animation and failures retain the retry action. This first screen is part of the installed TV shell package.
 - Avoid repainting identical cached home highlights on menu entry and periodic refresh; prune detached artwork when that shelf actually changes. Stress tests cover 100 rapid catalogue replacements and late image callbacks.
 - Reuse unchanged home schedule DOM and a bounded cache of repeated English translations. Purge detached thumbnail work when replacing catalogue/search results, index visibility callbacks by image, and release stalled image loads after 15 seconds while retaining the concurrency limit of two.
 - Refine the four player actions into rounded capsules with monochrome vector icons and a single clear white focus state. Pause/play artwork follows playback state, using static layers without blur, scaling or emoji.
