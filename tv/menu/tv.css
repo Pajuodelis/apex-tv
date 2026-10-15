@@ -284,3 +284,7 @@ body.high-contrast .settings-tabs,body.high-contrast .settings-pane>.settings-se
 #player-overlay #play-pause[data-paused=true]:focus:before{background-image:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%23141418%22%20stroke-width%3D%221.7%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22m8%205%2011%207-11%207z%22%2F%3E%3C%2Fsvg%3E")}
 body.high-contrast #player-overlay .player-buttons button{background:#000;border-color:#aaa;color:#fff}
 @media(max-width:1400px){#player-overlay .player-buttons button{min-height:54px;font-size:17px;padding:14px 21px}#player-overlay .player-buttons #play-pause{min-width:140px}#player-overlay .player-buttons button:before{width:21px;height:21px;flex-basis:21px;background-size:21px 21px;margin-right:10px}}
+/* Match menu action focus to the neutral player controls. */
+.tv-main button:not(.tile):focus{outline:0;background:#f5f5f7;color:#141418;box-shadow:0 0 0 4px #ffffff22}
+.tv-main .schedule-row:disabled{opacity:.85}
+body.high-contrast .tv-main button:not(.tile):focus{outline:3px solid #fff;outline-offset:4px;box-shadow:none}
