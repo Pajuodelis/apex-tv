@@ -5506,7 +5506,7 @@ window.ApexProtectionProbe = {
     (modal.querySelector('[data-modal-default]') || modal.querySelector('button')).focus();
   }
   function help() {
-    dialog('Pultelis ir žiūrėjimas', setupText('Rodyklės – pasirinkti. OK – atidaryti. Žiūrint OK atveria valdiklius; dar kartą OK ant Pauzės sustabdo vaizdą. Kairė / dešinė atveria laiko juostą: pasirink laiką ir patvirtink OK. Kol nepatvirtini, vaizdas tęsiamas. ⏯ sustabdo arba tęsia iš karto. Pirmas Atgal paslepia valdiklius, kitas grąžina į meniu. LIVE galima atsukti tik F1 pateikiamame laiko lange.','Arrows select, OK opens. While watching, OK shows controls; OK on Pause pauses playback. Left / right opens the timeline: choose a time and confirm with OK. Playback continues until you confirm. Play/Pause toggles immediately. Back hides controls; press again to return to the menu. Live seeking is limited to F1’s DVR window.'), [{label:'Supratau',default:true}]);
+    dialog('Pultelis ir žiūrėjimas', setupText('Rodyklės – pasirinkti. OK – atidaryti. Žiūrint OK atveria valdiklius; dar kartą OK ant Pauzės sustabdo vaizdą. Kairė / dešinė atveria laiko juostą: pasirink laiką ir patvirtink OK. Kol nepatvirtini, vaizdas tęsiamas. Play/Pause sustabdo arba tęsia iš karto. Pirmas Atgal paslepia valdiklius, kitas grąžina į meniu. LIVE galima atsukti tik F1 pateikiamame laiko lange.','Arrows select, OK opens. While watching, OK shows controls; OK on Pause pauses playback. Left / right opens the timeline: choose a time and confirm with OK. Playback continues until you confirm. Play/Pause toggles immediately. Back hides controls; press again to return to the menu. Live seeking is limited to F1’s DVR window.'), [{label:'Supratau',default:true}]);
   }
   function openItem(raw) {
     var item = UX.item(raw); if (!item) return; cancelRecovery();rememberView();
@@ -6535,7 +6535,7 @@ window.ApexProtectionProbe = {
   }
   function installPlayerControls() {
     if(document.getElementById('player-timeline'))return;
-    var hint=overlay.querySelector('p:last-child');if(hint){hint.className='player-help';hint.textContent=setupText('OK · valdikliai   ← / → · laiko juosta   ⏯ · pauzė / tęsti   Atgal · paslėpti','OK · controls   ← / → · timeline   ⏯ · play / pause   Back · hide');}
+    var hint=overlay.querySelector('p:last-child');if(hint){hint.className='player-help';hint.textContent=setupText('OK · valdikliai   ← / → · laiko juosta   Play/Pause · pauzė / tęsti   Atgal · paslėpti','OK · controls   ← / → · timeline   Play/Pause · play / pause   Back · hide');}
     var row=node('div','','player-time-row'),elapsed=node('span','0:00');elapsed.id='player-elapsed';row.appendChild(elapsed);
     var bar=node('div','','player-timeline');bar.id='player-timeline';bar.tabIndex=-1;bar.setAttribute('role','slider');bar.setAttribute('aria-label',setupText('Pasirinkti atkūrimo laiką','Choose playback time'));bar.setAttribute('aria-orientation','horizontal');bar.setAttribute('aria-valuemin','0');bar.appendChild(node('span','','scrub-fill'));bar.appendChild(node('span','','scrub-marker'));
     bar.addEventListener('focus',function(){if(!scrubber.active())startScrub();scheduleScrubPaint();});bar.addEventListener('blur',function(){cancelScrub();if(playing&&!overlay.hidden&&!seekBusy)updatePlayer();});
