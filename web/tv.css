@@ -288,3 +288,4 @@ body.high-contrast #player-overlay .player-buttons button{background:#000;border
 .tv-main button:not(.tile):focus{outline:0;background:#f5f5f7;color:#141418;box-shadow:0 0 0 4px #ffffff22}
 .tv-main .schedule-row:disabled{opacity:.85}
 body.high-contrast .tv-main button:not(.tile):focus{outline:3px solid #fff;outline-offset:4px;box-shadow:none}
+.tv-main .tile:focus .card-visual{outline:0;box-shadow:0 0 0 3px #f5f5f7}
