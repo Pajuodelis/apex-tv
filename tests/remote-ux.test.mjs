@@ -31,6 +31,13 @@ test('home grids reach the second visible row and horizontal shelves continue pa
  const grid=menu('grid');grid.document.activeElement=grid.cards[0];grid.c.moveMenuFocus(40);assert.equal(grid.document.activeElement,grid.cards[4]);grid.c.moveMenuFocus(39);assert.equal(grid.document.activeElement,grid.cards[5]);
  const row=menu('flex');row.document.activeElement=row.cards[3];row.c.moveMenuFocus(39);assert.equal(row.document.activeElement,row.cards[4]);
 });
+test('settings tabs move without changing category until OK or Down; Down enters the chosen pane',()=>{
+ const document={activeElement:null},selected={focus(){document.activeElement=this;}},control={focus(){document.activeElement=this;}},nav={contains:()=>false,querySelector:()=>selected},parent={children:[],classList:{contains:name=>name==='settings-tabs'}};
+ let category=0;const tabs=[0,1,2].map(index=>({parentNode:parent,getAttribute:()=>category===index?'true':'false',click(){category=index;},focus(){document.activeElement=this;}}));parent.children=tabs;
+ const c={Date,document,current:{},motion:{cancel(){}},artworkLoader:{defer(){}},root:{contains:()=>true,querySelector:name=>name==='.tv-nav'?nav:control}};vm.createContext(c);vm.runInContext(piece('moveMenuFocus','navigationNow'),c);
+ document.activeElement=tabs[0];c.moveMenuFocus(39);assert.equal(document.activeElement,tabs[1]);assert.equal(category,0);c.moveMenuFocus(40);assert.equal(category,1);assert.equal(document.activeElement,control);
+ document.activeElement=tabs[0];c.moveMenuFocus(37);assert.equal(document.activeElement,selected);document.activeElement=tabs[2];c.moveMenuFocus(39);assert.equal(document.activeElement,tabs[2]);
+});
 function player(){
  const counts={show:0,toggle:0,seek:0,move:0,stop:0,play:0,pause:0},document={activeElement:null};let state='PLAYING';
  function button(){return{hidden:false,disabled:false,focus(){document.activeElement=this;},click(){counts.toggle++;}};}
