@@ -189,7 +189,7 @@ window.ApexProtectionProbe = {
   var browserPlayer = null, activeEngine = '', prepareTimer = 0, localRelay = null;
   var commandBusy = false, lastCommand = '';
   var renderedView = null, awaitingCatalogFocus = null;
-  var UI=window.ApexUI, artworkLoader=UI.images(window,document), focusSpatial=UI.spatial(root,window);
+  var UI=window.ApexUI, artworkLoader=UI.images(window,document), focusSpatial=UI.spatial(root,window), gridLayout=UI.grids(window);
   var motion=UI.motion(window,function(){return localStore&&localStore.getPreference('reduceMotion');});
   var overlay = document.getElementById('player-overlay');
   var video = document.getElementById('html-player');
@@ -386,7 +386,7 @@ window.ApexProtectionProbe = {
   function scheduleScrubPaint(){if(scrubPaintFrame)return;if(window.requestAnimationFrame)scrubPaintFrame=window.requestAnimationFrame(paintScrub);else{scrubPaintFrame=1;setTimeout(paintScrub,16);}}
   function moveScrub(direction){if(seekBusy||viewBusy)return;if(!scrubber.active()&&!startScrub())return;scrubber.move(direction,Date.now());scheduleScrubPaint();}
   function commitScrub(){
-    if(seekBusy||viewBusy||!playing)return;var m=metrics()||lastMetrics,target=scrubber.commit(scrubRange(m));cancelScrub();if(target===null)return;
+    if(seekBusy||viewBusy||!playing)return;var m=metrics()||lastMetrics,target=scrubber.commit(scrubRange(m));cancelScrub();showOverlay();if(target===null)return;
     if(activeEngine==='AVPlay'){nativeSeek(target,function(e){if(!e&&lastMetrics){lastMetrics.position=target;savePlayback();}if(!overlay.hidden)updatePlayer();});}
     else{try{video.currentTime=target;updatePlayer();}catch(_){document.getElementById('player-state').textContent=setupText('Persukti nepavyko. Bandyk dar kartą.','Seek failed. Try again.');}}
   }
@@ -395,8 +395,36 @@ window.ApexProtectionProbe = {
     var line=document.getElementById('player-timeline');if(document.activeElement!==line||overlay.hidden)return false;
     if(key===37||key===39){moveScrub(key===37?-1:1);return true;}
     if(key===13){commitScrub();return true;}
-    if(key===40){cancelScrub();document.getElementById('play-pause').focus();updatePlayer();return true;}
+    if(key===40){cancelScrub();showOverlay();document.getElementById('play-pause').focus();updatePlayer();return true;}
     if(key===38)return true;return false;
+  }
+  function playerKey(key){
+    if(timelineKey(key))return true;
+    var pause=document.getElementById('play-pause');
+    if(key===13){
+      if(!overlay.hidden&&overlay.contains(document.activeElement))document.activeElement.click();
+      else{showOverlay();pause.focus();}
+      return true;
+    }
+    if(key===10252){toggle();return true;}
+    if(key===38||key===40){showOverlay();if(key===38&&focusScrub())return true;pause.focus();return true;}
+    if(key===37||key===39){
+      if(overlay.hidden||!overlay.contains(document.activeElement)){
+        showOverlay();if(focusScrub())moveScrub(key===37?-1:1);else pause.focus();
+      }else{
+        showOverlay();var controls=Array.prototype.slice.call(overlay.querySelectorAll('button')).filter(function(b){return !b.disabled&&!b.hidden;}),index=controls.indexOf(document.activeElement),next=index+(key===37?-1:1);
+        if(next>=0&&next<controls.length)controls[next].focus();
+      }
+      return true;
+    }
+    if(key===415||key===19){
+      if(seekBusy)return true;
+      try{if(activeEngine==='AVPlay'){var state=nativePlayer.getState();if(key===415&&state==='PAUSED')nativePlayer.play();if(key===19&&state==='PLAYING'){nativePlayer.pause();clearTimeout(prepareTimer);}}
+      else if(key===415)video.play();else video.pause();}catch(_){}showOverlay();return true;
+    }
+    if(key===412||key===417){seek(key===417);return true;}
+    if(key===413){stopPlayback();return true;}
+    return false;
   }
 
 
@@ -420,7 +448,7 @@ window.ApexProtectionProbe = {
     (modal.querySelector('[data-modal-default]') || modal.querySelector('button')).focus();
   }
   function help() {
-    dialog('Pultelis ir žiūrėjimas', 'Rodyklės pasirenka kortelę, OK ją atidaro. Atgal grąžina į ankstesnį ekraną. Grotuve Atgal pirmiausia paslepia valdiklius, kitas paspaudimas grąžina į meniu. OK sustabdo arba tęsia vaizdą; kairė / dešinė persuka 10 sek. Aukštyn atveria valdiklius. Šoninis meniu atveriamas kairėn arba Atgal Pradžioje. Paieška ieško visame F1 archyve. LIVE galima atsukti tik F1 pateikiamame laiko lange. Eterio mygtukas grąžina į dabartinę transliaciją.', [{label:'Supratau',default:true}]);
+    dialog('Pultelis ir žiūrėjimas', setupText('Rodyklės – pasirinkti. OK – atidaryti. Žiūrint OK atveria valdiklius; dar kartą OK ant Pauzės sustabdo vaizdą. Kairė / dešinė atveria laiko juostą: pasirink laiką ir patvirtink OK. Kol nepatvirtini, vaizdas tęsiamas. ⏯ sustabdo arba tęsia iš karto. Pirmas Atgal paslepia valdiklius, kitas grąžina į meniu. LIVE galima atsukti tik F1 pateikiamame laiko lange.','Arrows select, OK opens. While watching, OK shows controls; OK on Pause pauses playback. Left / right opens the timeline: choose a time and confirm with OK. Playback continues until you confirm. Play/Pause toggles immediately. Back hides controls; press again to return to the menu. Live seeking is limited to F1’s DVR window.'), [{label:'Supratau',default:true}]);
   }
   function openItem(raw) {
     var item = UX.item(raw); if (!item) return; cancelRecovery();rememberView();
@@ -736,6 +764,7 @@ window.ApexProtectionProbe = {
   var phoneLoginCleanup = null;
   function cancelPhoneScreen() { if (phoneLoginCleanup) phoneLoginCleanup(); phoneLoginCleanup = null; }
   function render() {
+    navigationQueue.cancel();
     cancelPhoneScreen();
     if(modal)closeModal();clearTimeout(searchTimer);clearInterval(liveTimer);applyPreferences();
     rememberView();var pending=++pendingRequest,main=layout();awaitingCatalogFocus=null;
@@ -1408,7 +1437,7 @@ window.ApexProtectionProbe = {
   }
   function installPlayerControls() {
     if(document.getElementById('player-timeline'))return;
-    var hint=overlay.querySelector('p:last-child');if(hint)hint.textContent=setupText('↑ – laiko juosta · ← / → – pasirinkti · OK – persukti · Atgal – paslėpti','↑ – timeline · ← / → – select · OK – seek · Back – hide');
+    var hint=overlay.querySelector('p:last-child');if(hint){hint.className='player-help';hint.textContent=setupText('OK · valdikliai   ← / → · laiko juosta   ⏯ · pauzė / tęsti   Atgal · paslėpti','OK · controls   ← / → · timeline   ⏯ · play / pause   Back · hide');}
     var row=node('div','','player-time-row'),elapsed=node('span','0:00');elapsed.id='player-elapsed';row.appendChild(elapsed);
     var bar=node('div','','player-timeline');bar.id='player-timeline';bar.tabIndex=-1;bar.setAttribute('role','slider');bar.setAttribute('aria-label',setupText('Pasirinkti atkūrimo laiką','Choose playback time'));bar.setAttribute('aria-orientation','horizontal');bar.setAttribute('aria-valuemin','0');bar.appendChild(node('span','','scrub-fill'));bar.appendChild(node('span','','scrub-marker'));
     bar.addEventListener('focus',function(){if(!scrubber.active())startScrub();scheduleScrubPaint();});bar.addEventListener('blur',function(){cancelScrub();if(playing&&!overlay.hidden&&!seekBusy)updatePlayer();});
@@ -1469,7 +1498,7 @@ window.ApexProtectionProbe = {
   }
 
   function showOverlay() {
-    var entering=overlay.hidden;overlayDismissed=false;overlay.hidden=false;if(entering){motion.enter(overlay);if(playing)updatePlayer();}clearTimeout(hideTimer);hideTimer=setTimeout(function(){if(playing&&!modal&&!viewBusy&&!seekBusy&&!(lastMetrics&&lastMetrics.paused)&&!overlay.contains(document.activeElement))overlay.hidden=true;},7000);
+    var entering=overlay.hidden;overlayDismissed=false;overlay.hidden=false;if(entering){motion.enter(overlay);if(playing)updatePlayer();}clearTimeout(hideTimer);hideTimer=setTimeout(function(){var draft=typeof scrubber!=='undefined'&&scrubber.snapshot();if(playing&&!modal&&!viewBusy&&!seekBusy&&!(lastMetrics&&lastMetrics.paused)&&!(draft&&draft.dirty))hideOverlay();},6000);
   }
   function hideOverlay() {
     if(typeof cancelScrub==='function')cancelScrub();clearTimeout(hideTimer);overlayDismissed=true;overlay.hidden=true;
@@ -1518,7 +1547,7 @@ window.ApexProtectionProbe = {
     if(nav&&nav.contains(active)){var navItems=Array.prototype.slice.call(nav.children),ni=navItems.indexOf(active);if(key===38)winner=ni>0?navItems[ni-1]:profile;else if(key===40&&ni<navItems.length-1)winner=navItems[ni+1];else if(key===39){var all=root.querySelectorAll('[data-focus-key]');for(var f=0;f<all.length;f++)if(all[f].getAttribute('data-focus-key')===current.sidebarReturn&&!all[f].disabled&&all[f].offsetParent!==null)winner=all[f];winner=winner||firstMenuContent();}if(winner)winner.focus();return;}
     var parent=active.parentNode;
     if(active.classList.contains('tile')&&parent&&parent.classList.contains('tiles')){
-      var cards=parent.children,index=Array.prototype.indexOf.call(cards,active),horizontal=parent.classList.contains('home-tiles'),columns=horizontal?cards.length:innerWidth<=1000?3:4;
+      var cards=parent.children,index=Array.prototype.indexOf.call(cards,active),layout=gridLayout(parent),horizontal=layout.row,columns=layout.columns;
       if(key===37&&(horizontal?index>0:index%columns>0))winner=cards[index-1];else if(key===39&&(horizontal?index+1<cards.length:index%columns<columns-1&&index+1<cards.length))winner=cards[index+1];
       else if(key===37){current.sidebarReturn=active.getAttribute('data-focus-key');winner=nav.querySelector('.selected');}
       else if(key===38){if(!horizontal&&index>=columns)winner=cards[index-columns];else if(parent.classList.contains('catalog-tiles'))winner=root.querySelector('.catalog-tools button')||root.querySelector('[data-back-focus]')||nav.querySelector('.selected');else{var section=parent.closest('.home-section'),before=section&&section.previousElementSibling,prior=before&&before.querySelector('.tiles');winner=prior?prior.children[Math.min(index,prior.children.length-1)]:before&&before.querySelector('.schedule-row:not(:disabled)')||root.querySelector('.hero-actions button');}}
@@ -1546,6 +1575,7 @@ window.ApexProtectionProbe = {
       diagnostic('ui_navigation_latency', { engine: '8 keys; focus ' + summary(navigationSamples) + '; next frame ' + summary(navigationFrames) });
     });
   }
+  var navigationQueue=UI.keys(window,navigate);
   window.ApexTV = {
     start: function () {
       installPlayerControls();applyPreferences();updateService=window.ApexOnlineUpdates.install(window.APEX_CONFIG,ctx,function(){return !playing&&!modal&&!recoveryPending&&!document.hidden&&current.tab==='home'&&Date.now()-lastMenuInput>15000;});setInterval(updatePlayer,1000);setInterval(function(){if(updateService&&!playing&&!modal&&!recoveryPending&&!document.hidden&&current.tab==='home'&&Date.now()-lastMenuInput>15000&&navigator.onLine!==false)window.ApexUpdateMenu().catch(function(){});},30000);
@@ -1554,22 +1584,15 @@ window.ApexProtectionProbe = {
       try { if (window.tizen && tizen.tvinputdevice) ['MediaPlayPause', 'MediaPlay', 'MediaPause', 'MediaStop', 'MediaRewind', 'MediaFastForward'].forEach(function (key) { tizen.tvinputdevice.registerKey(key); }); } catch (e) {}
       document.addEventListener('keydown', function (event) {
         var key = event.keyCode;lastMenuInput=Date.now();
+        if(key===10009||key===27)navigationQueue.cancel();else if(key<37||key>40)navigationQueue.flush();
         if(modal){event.preventDefault();event.stopPropagation();if(key===10009||key===27)closeModal();else{var options=Array.prototype.slice.call(modal.querySelectorAll('button')),index=options.indexOf(document.activeElement);if(key===13&&index>=0)options[index].click();else if(key===9||key>=37&&key<=40)options[(index+(key===37||key===38||(key===9&&event.shiftKey)?-1:1)+options.length)%options.length].focus();}return;}
         if (event.target && /^(INPUT|TEXTAREA)$/.test(event.target.tagName)) { if (key === 10009 || key === 27) { event.preventDefault(); event.target.blur(); } return; }
         if (key === 10009 || key === 27) { event.preventDefault(); goBack(); return; }
         if (playing) {
-          if(timelineKey(key)){event.preventDefault();return;}
-          if (key === 13) { event.preventDefault(); if (!overlay.hidden && overlay.contains(document.activeElement)) document.activeElement.click(); else toggle(); }
-          else if (key === 10252) { event.preventDefault(); toggle(); }
-          else if (key === 38 || key === 40) { event.preventDefault(); showOverlay();if(key===38&&focusScrub())return;document.getElementById(key===38?'play-pause':'player-more').focus(); }
-          else if (key === 415 || key === 19) { event.preventDefault(); if(seekBusy)return;try { if (activeEngine === 'AVPlay') { var playerState = nativePlayer.getState(); if (key === 415 && playerState === 'PAUSED') nativePlayer.play(); if (key === 19 && playerState === 'PLAYING') { nativePlayer.pause();clearTimeout(prepareTimer); } } else if (key === 415) video.play(); else video.pause(); } catch (e) {} showOverlay(); }
-          else if (key === 37 || key === 39) { event.preventDefault(); if(!overlay.hidden&&overlay.contains(document.activeElement)){var controls=Array.prototype.slice.call(overlay.querySelectorAll('button')).filter(function(b){return !b.disabled&&!b.hidden;}),index=controls.indexOf(document.activeElement),next=index+(key===37?-1:1);if(next>=0&&next<controls.length)controls[next].focus();}else seek(key===39); }
-          else if (key === 412 || key === 417) { event.preventDefault(); seek(key===417); }
-          else if (key === 413) { event.preventDefault(); stopPlayback(); }
-          else showOverlay();
+          if(playerKey(key))event.preventDefault();else showOverlay();
           return;
         }
-        if (key >= 37 && key <= 40) { event.preventDefault(); navigate(key); }
+        if (key >= 37 && key <= 40) { event.preventDefault(); navigationQueue.push(key); }
       });
       var info = productInfo(); info.engine = nativePlayer ? 'AVPlay' : 'browser preview';
       diagnostic('app_started', info); refreshAccount();
@@ -1592,7 +1615,7 @@ window.ApexProtectionProbe = {
       setInterval(function () { if (!playing && !document.hidden) request('/api/status').then(function (data) { account = data.account; if (ctx.standalone && account && account.signedIn && account.expires < Date.now()/1000+1800) window.ApexStandalone.refresh().catch(function () {}); }).catch(function () {}); }, 30000);
       if (!ctx.preview) { setInterval(pollTvCommand, 2000); pollTvCommand(); }
       window.addEventListener('offline',updateConnection);window.addEventListener('online',function(){updateConnection();if(!document.hidden&&!playing&&!recoveryPending){catalogueCache.clear();render();}});
-      document.addEventListener('visibilitychange',function(){if(document.hidden){cancelPhoneScreen();cancelRecovery();if(playing)stopPlayback();else{pendingRequest++;var status=root.querySelector('.request-status');if(status)status.remove();}}else if(!playing)render();});
+      document.addEventListener('visibilitychange',function(){if(document.hidden){navigationQueue.cancel();cancelPhoneScreen();cancelRecovery();if(playing)stopPlayback();else{pendingRequest++;var status=root.querySelector('.request-status');if(status)status.remove();}}else if(!playing)render();});
     }
   };
 }());

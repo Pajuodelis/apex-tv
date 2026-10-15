@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.5.11 — local candidate, not published
+
+- Coalesce dense remote arrow repeats into one focus action per animation frame, reuse menu geometry during shell scrolling, and follow the actual grid or horizontal shelf layout.
+- OK reveals player controls without pausing. Dedicated Play/Pause remains immediate. Left/right opens a timeline preview; OK confirms one seek, while Back cancels and hides controls.
+- Emphasize Pause, enlarge the timeline target and show concise English/Lithuanian remote hints. Controls hide after inactivity while playing, preserving paused and unconfirmed timeline selections.
+- Local validation covers remote events in Chromium 76 and Chrome 120 with mock playback. Physical TV picture, sound and remote responsiveness must still be checked before publication.
+
 ## 0.5.10 — 2026-10-14
 
 - Fix highlights playback when a static DASH manifest splits inherited timing and media paths between parent and representation SegmentTemplate elements. The existing XML adapter now merges these scopes before local routing.

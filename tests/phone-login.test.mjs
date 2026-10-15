@@ -77,7 +77,7 @@ test('UI cancellation clears its timer and direct F1 polling on Back, navigation
  const begin=source.indexOf('  var phoneLoginCleanup = null;'),end=source.indexOf('  function render()');
  const c={};vm.createContext(c);vm.runInContext(source.slice(begin,end),c);let cancelled=0;c.phoneLoginCleanup=()=>cancelled++;
  c.cancelPhoneScreen();c.cancelPhoneScreen();assert.equal(cancelled,1);assert.equal(c.phoneLoginCleanup,null);
- assert.match(source,/function render\(\)\s*\{\s*cancelPhoneScreen\(\)/);
+ assert.match(source,/function render\(\)\s*\{\s*navigationQueue.cancel\(\);\s*cancelPhoneScreen\(\)/);
  assert.match(source,/function goBack\(\)\s*\{\s*cancelPhoneScreen\(\)/);
- assert.match(source,/visibilitychange[^\n]*document.hidden\)\{cancelPhoneScreen\(\)/);
+ assert.match(source,/visibilitychange[^\n]*document.hidden\)\{navigationQueue.cancel\(\);cancelPhoneScreen\(\)/);
 });

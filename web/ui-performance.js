@@ -61,12 +61,18 @@
     } };
   }
   function spatial(root, env) {
-    var entries = null;
+    var entries = null, scroller = null;
     function invalidate() { entries = null; }
     if (env.MutationObserver) new env.MutationObserver(invalidate).observe(root, { childList: true, subtree: true, attributes: true, attributeFilter: ['disabled','hidden','class'] });
-    root.addEventListener('scroll', invalidate, true); env.addEventListener('resize', invalidate);
+    root.addEventListener('scroll', function (event) {
+      // All main controls share this scroll coordinate system. Scrolling the
+      // shell does not change distances between them; nested scrollers do.
+      if (!event || !scroller || event.target !== scroller) invalidate();
+    }, true); env.addEventListener('resize', invalidate);
     return function (active, key) {
-      if (!entries) entries = Array.prototype.slice.call(root.querySelectorAll('main button,main input,.footer-help')).filter(function (el) { return !el.disabled && el.offsetParent !== null; }).map(function (el) { var r = el.getBoundingClientRect(); return { el: el, x: r.left+r.width/2, y: r.top+r.height/2 }; });
+      if (!entries) { scroller = root.querySelector ? root.querySelector('.tv-shell') : null;
+        entries = Array.prototype.slice.call(root.querySelectorAll('main button,main input,main textarea,.footer-help')).filter(function (el) { return !el.disabled && el.offsetParent !== null; }).map(function (el) { var r = el.getBoundingClientRect(); return { el: el, x: r.left+r.width/2, y: r.top+r.height/2 }; });
+      }
       var origin = entries.filter(function (item) { return item.el === active; })[0]; if (!origin) { invalidate(); return null; }
       var best = Infinity, winner = null;
       entries.forEach(function (item) { if (item.el === active || item.el.disabled) return;
@@ -75,6 +81,26 @@
       }); return winner;
     };
   }
-  var api = { set: set, text: text, attr: attr, style: style, motion: motion, images: images, spatial: spatial };
+  function keys(env, run) {
+    var frame = 0, latest = null;
+    function drain() { frame = 0; var key = latest; latest = null; if (key !== null) run(key); }
+    function cancel() { if (frame) env.cancelAnimationFrame(frame); frame = 0; latest = null; }
+    return { push: function (key) {
+      if (!env.requestAnimationFrame || !env.cancelAnimationFrame) { run(key); return; }
+      latest = key; if (!frame) frame = env.requestAnimationFrame(drain);
+    }, flush: function () { if (frame) env.cancelAnimationFrame(frame); drain(); }, cancel: cancel };
+  }
+  function grids(env) {
+    var cache = new WeakMap(); env.addEventListener('resize', function () { cache = new WeakMap(); });
+    return function (parent) {
+      var saved = cache.get(parent), count = parent.children.length;
+      if (!saved || saved.count !== count) {
+        var style = env.getComputedStyle(parent), row = style.display === 'flex' && !/column/.test(style.flexDirection || ''), tracks = String(style.gridTemplateColumns || '').trim();
+        saved = { count: count, row: row, columns: row ? count : tracks && tracks !== 'none' ? tracks.split(/\s+/).length : 1 }; cache.set(parent, saved);
+      }
+      return saved;
+    };
+  }
+  var api = { set: set, text: text, attr: attr, style: style, motion: motion, images: images, spatial: spatial, keys: keys, grids: grids };
   global.ApexUI = api; if (typeof module === 'object' && module.exports) module.exports = api;
 }(typeof window !== 'undefined' ? window : globalThis));

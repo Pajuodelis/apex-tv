@@ -32,7 +32,9 @@ remote. After installation, no phone or computer needs to stay running.
 - Use four primary player actions and a remote timeline: Up, arrows to choose, OK to seek; holding an arrow accelerates.
 
 F1 Live commentary is selected by default when available. Choose
-International manually under **Audio**. Press **Back** to hide player controls;
+International manually under **Audio**. Press **OK** to show controls, then **OK** on
+**Pause** to pause. The remote's dedicated **Play/Pause** button works immediately.
+Press **Back** to hide player controls;
 press it again to return to the menu. Timeline changes remain a preview until
 **OK**; **Back** cancels the selection and hides controls. Live seeking is
 available only within the DVR window supplied by F1.
