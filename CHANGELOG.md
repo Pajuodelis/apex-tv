@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.5.11 — local candidate, not published
+## 0.5.11 — 2026-10-15
 
 - Center the startup wordmark on a quiet static backdrop with a small CSS-only loading indicator. No external assets or minimum display delay; reduced-motion media preferences disable animation and failures retain the retry action. This first screen is part of the installed TV shell package.
 - Avoid repainting identical cached home highlights on menu entry and periodic refresh; prune detached artwork when that shelf actually changes. Stress tests cover 100 rapid catalogue replacements and late image callbacks.
@@ -15,7 +15,8 @@
 - Coalesce dense remote arrow repeats into one focus action per animation frame, reuse menu geometry during shell scrolling, and follow the actual grid or horizontal shelf layout.
 - OK reveals player controls without pausing. Dedicated Play/Pause remains immediate. Left/right opens a timeline preview; OK confirms one seek, while Back cancels and hides controls.
 - Emphasize Pause, enlarge the timeline target and show concise English/Lithuanian remote hints. Controls hide after inactivity while playing, preserving paused and unconfirmed timeline selections.
-- Local validation covers remote events in Chromium 76 and Chrome 120 with mock playback. Physical TV picture, sound and remote responsiveness must still be checked before publication.
+- Validation: 251 automated tests, Chromium 76 and Chrome 120 remote-control checks, and a physical Samsung UE55AU7092 / Tizen 6 test. The user confirmed smooth navigation, moving picture and sound after installing 0.5.11; the saved sign-in was retained. Physical Tizen 9 validation is still pending.
+- Existing installations receive menu, Settings, artwork and player improvements through the signed update feed. The centered startup screen belongs to the installed shell and requires reinstalling the new WGT with the same signing identity.
 
 ## 0.5.10 — 2026-10-14
 
