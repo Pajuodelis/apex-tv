@@ -1441,7 +1441,22 @@ window.ApexProtectionProbe = {
       commentaries.forEach(function(channel){var selected=(state.channelId===channel.id||!state.channelId&&channel.default)&&(!chosen||/^(eng|en)$/.test(chosen.language));
         choices.push({label:(selected?'✓ ':'')+(channel.title==='International'?'Anglų · International':channel.title),run:function(){if(!selected)changeView({channelId:channel.id,channelTitle:channel.title,audioLanguage:'eng',commentary:true});}});
       });
-      state.audioTracks.forEach(function(track){if(commentaries.length&&Views.commentaryTitle(state.channelTitle)&&/^(eng|en)$/.test(track.language))return;choices.push({label:(track.id===state.audioTrackId?'✓ ':'')+track.label,run:function(){if(track.id!==state.audioTrackId)changeView({audioTrackId:track.id});}});});
+      var intl=commentaries.filter(function(channel){return channel.title==='International';})[0],others=state.audioTracks.filter(function(track){return !/^(eng|en)$/.test(track.language);});
+      function languageMenu(tracks,pick){var list=[{label:'Grįžti',default:true,run:selectAudio}];tracks.forEach(function(track){list.push({label:(track.id===state.audioTrackId?'✓ ':'')+track.label,run:function(){pick(track);}});});dialog('Kalbos','Pasirink komentatorių kalbą. Pakeitimas gali užtrukti kelias sekundes.',list);}
+      function pickHere(track){if(track.id!==state.audioTrackId)changeView({audioTrackId:track.id});}
+      function pickInternational(track){changeView({channelId:intl.id,channelTitle:intl.title,audioLanguage:track.language,commentary:true});}
+      // F1 Live carries English only; other languages ride on International. Read them from the current stream when present, otherwise ask the service for International's tracks.
+      function openLanguages(){
+        if(others.length)return languageMenu(others,pickHere);
+        viewBusy=true;updateViewControls();showOverlay();
+        request('/api/play','POST',{id:state.item.id,channelId:intl.id,audioTrackId:'',audioLanguage:'eng'}).then(function(stream){
+          if(generation!==epoch||activePlayback!==state)return;viewBusy=false;updateViewControls();
+          var found=streamAudioChoices(stream).filter(function(track){return !/^(eng|en)$/.test(track.language);});
+          if(found.length)languageMenu(found,pickInternational);else dialog('Kalbos','F1 šiam įrašui kitų kalbų nepateikė.',[{label:'Grįžti',default:true,run:selectAudio}]);
+        }).catch(function(){if(generation!==epoch||activePlayback!==state)return;viewBusy=false;updateViewControls();dialog('Kalbos','Kalbų sąrašo gauti nepavyko.',[{label:'Grįžti',default:true,run:selectAudio},{label:'Bandyti dar kartą',run:openLanguages}]);});
+      }
+      if(commentaries.length){if(others.length||intl)choices.push({label:'Kalbos…',run:openLanguages});}
+      else state.audioTracks.forEach(function(track){choices.push({label:(track.id===state.audioTrackId?'✓ ':'')+track.label,run:function(){if(track.id!==state.audioTrackId)changeView({audioTrackId:track.id});}});});
       if(message)choices.push({label:'Bandyti dar kartą',run:selectAudio});
       dialog('Kalba ir garsas',message?'Komentavimo kanalų nepavyko gauti. Esamo srauto garso takelius gali pasirinkti.':commentaries.length?'F1 Live pasirenkamas automatiškai. International ir kitas kalbas gali pasirinkti ranka. Pakeitimas gali užtrukti kelias sekundes.':state.audioTracks.length?'Rodomos tik šio F1 srauto pateikiamos kalbos ir garso takeliai. Pakeitimas gali užtrukti kelias sekundes.':'Šio srauto garso pasirinkimas neprieinamas.',choices);
     }
