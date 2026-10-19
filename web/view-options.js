@@ -7,7 +7,10 @@
   function clean(value,max){return String(value||'').replace(/[\u0000-\u001f\u007f]/g,'').trim().slice(0,max||120);}
   function decode(value){return value.replace(/&amp;/g,'&').replace(/&quot;/g,'"').replace(/&apos;/g,"'").replace(/&lt;/g,'<').replace(/&gt;/g,'>');}
   function language(value){var v=clean(value,24).toLowerCase();return /^[a-z]{2,3}(?:-[a-z0-9]{2,8}){0,2}$/.test(v)?v:'und';}
-  function languageName(value){var v=language(value),names={eng:'Anglų',en:'Anglų',deu:'Vokiečių',ger:'Vokiečių',de:'Vokiečių',fra:'Prancūzų',fre:'Prancūzų',fr:'Prancūzų',spa:'Ispanų',es:'Ispanų',por:'Portugalų',pt:'Portugalų',nld:'Nyderlandų',dut:'Nyderlandų',nl:'Nyderlandų',ita:'Italų',it:'Italų',lit:'Lietuvių',lt:'Lietuvių',und:'Garso takelis'};return names[v.split('-')[0]]||v.toUpperCase();}
+  var FAMILY={eng:'en',deu:'de',ger:'de',fra:'fr',fre:'fr',spa:'es',por:'pt',nld:'nl',dut:'nl',ita:'it',lit:'lt',jpn:'ja'};
+  function family(value){var base=language(value).split('-')[0];return FAMILY[base]||base;}
+  function languageName(value){var v=language(value),names={en:'Anglų',de:'Vokiečių',fr:'Prancūzų',es:'Ispanų',pt:'Portugalų',nl:'Nyderlandų',it:'Italų',lt:'Lietuvių',ja:'Japonų',und:'Garso takelis'};
+    if(/^(por|pt)-br$/.test(v))return 'Portugalų (Brazilija)';return names[family(v)]||v.toUpperCase();}
   function audioId(text){
     var head=text.match(/<AdaptationSet\b[^>]*>/);if(!head)return '';
     var id=attr(head[0],'id');if(/^[A-Za-z0-9_.:-]{1,120}$/.test(id))return 'set:'+id;
@@ -32,6 +35,7 @@
     var tracks=audioTracks(xml),track=null;
     if(id){for(var i=0;i<tracks.length;i++)if(tracks[i].id===id)track=tracks[i];if(!track)throw Error('F1 nepateikė pasirinkto garso takelio.');return track;}
     var wanted=language(preferred);for(var j=0;j<tracks.length;j++)if(preferred&&tracks[j].language===wanted&&!track)track=tracks[j];
+    for(var m=0;m<tracks.length;m++)if(preferred&&family(tracks[m].language)===family(wanted)&&!track)track=tracks[m];
     for(var k=0;k<tracks.length;k++)if(/^(eng|en)$/i.test(tracks[k].language)&&!track)track=tracks[k];return track||tracks[0]||null;
   }
   function channels(data){
@@ -51,5 +55,5 @@
   function commentaryChannels(data){return channels(data).filter(isCommentary).map(function(channel){channel.title=commentaryTitle(channel.title);return channel;});}
   function defaultCommentary(data){return commentaryChannels(data).filter(function(channel){return channel.title==='F1 Live';})[0]||null;}
   function cameraChannels(data){return channels(data).filter(function(channel){return !isCommentary(channel);});}
-  return {defaultCommentary:defaultCommentary,commentaryTitle:commentaryTitle,isCommentary:isCommentary,commentaryChannels:commentaryChannels,cameraChannels:cameraChannels,audioId:audioId,audioTracks:audioTracks,selectAudio:selectAudio,channels:channels,language:language,languageName:languageName};
+  return {defaultCommentary:defaultCommentary,commentaryTitle:commentaryTitle,isCommentary:isCommentary,commentaryChannels:commentaryChannels,cameraChannels:cameraChannels,audioId:audioId,audioTracks:audioTracks,selectAudio:selectAudio,channels:channels,language:language,family:family,languageName:languageName};
 }));

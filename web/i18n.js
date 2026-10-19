@@ -47,6 +47,8 @@
   ". Televizoriuje turi būti atidaryta Apex TV.": ". Apex TV must be open on the television.",
   "720p · mažiau duomenų": "720p · lower data use",
   "Anglų": "English",
+  "Japonų": "Japanese",
+  "Portugalų (Brazilija)": "Portuguese (Brazil)",
   "Apex TV perkraunama. Išsaugotas F1 prisijungimas bus atkurtas.": "Apex TV is restarting. Your saved F1 sign-in will be restored.",
   "Artimiausia sesija ·": "Next session ·",
   "Artėja": "Upcoming",

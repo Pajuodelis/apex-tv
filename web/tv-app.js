@@ -1396,7 +1396,7 @@ window.ApexProtectionProbe = {
   function prepareViewPlayback(item,stream,compatibilityStart,resumeAt,options) {
     options=options||{};var choices=streamAudioChoices(stream),id=stream.audioTrackId||options.audioTrackId||'',chosen=choices.filter(function(t){return t.id===id;})[0];
     if(id&&!chosen)throw Error('F1 nepateikė pasirinkto garso takelio.');
-    if(!chosen)chosen=choices.filter(function(t){return t.language===preferredAudioLanguage;})[0]||choices.filter(function(t){return /^(eng|en)$/.test(t.language);})[0]||choices[0];
+    if(!chosen)chosen=choices.filter(function(t){return t.language===preferredAudioLanguage;})[0]||choices.filter(function(t){return preferredAudioLanguage&&Views.family(t.language)===Views.family(preferredAudioLanguage);})[0]||choices.filter(function(t){return /^(eng|en)$/.test(t.language);})[0]||choices[0];
     stream.audioTrackId=chosen?chosen.id:'';stream.videoQuality=Quality.mode(options.videoQuality||stream.videoQuality||preferredQuality);
     return {item:item,stream:stream,videoQuality:stream.videoQuality,bestBandwidth:stream.selectedVideo&&stream.selectedVideo.bandwidth,bestHeight:stream.selectedVideo&&stream.selectedVideo.height,compatibilityStart:compatibilityStart,resumeAt:resumeAt||0,resumeApplied:false,channelId:String(stream.channelId||options.channelId||''),channelTitle:String(options.channelTitle||'').slice(0,120),audioTracks:choices,audioTrackId:chosen?chosen.id:'',audioLanguage:chosen?chosen.language:''};
   }
@@ -1437,11 +1437,11 @@ window.ApexProtectionProbe = {
     function showChoices(data,message){
       if(generation!==epoch||current!==view||state!==activePlayback)return;viewBusy=false;updateViewControls();
       var channels=Views.channels(data);if(!message)catalogueCache.put(route,channels);
-      var commentaries=Views.commentaryChannels({channels:channels}),choices=[{label:'Grįžti',default:true}],chosen=state.audioTracks.filter(function(track){return track.id===state.audioTrackId;})[0],international=commentaries.some(function(channel){return channel.title==='International';}),liveSelected=Views.commentaryTitle(state.channelTitle)==='F1 Live';
-      commentaries.forEach(function(channel){var selected=(state.channelId===channel.id||!state.channelId&&channel.default)&&(channel.title!=='International'||!chosen||/^(eng|en)$/.test(chosen.language));
+      var commentaries=Views.commentaryChannels({channels:channels}),choices=[{label:'Grįžti',default:true}],chosen=state.audioTracks.filter(function(track){return track.id===state.audioTrackId;})[0];
+      commentaries.forEach(function(channel){var selected=(state.channelId===channel.id||!state.channelId&&channel.default)&&(!chosen||/^(eng|en)$/.test(chosen.language));
         choices.push({label:(selected?'✓ ':'')+(channel.title==='International'?'Anglų · International':channel.title),run:function(){if(!selected)changeView({channelId:channel.id,channelTitle:channel.title,audioLanguage:'eng',commentary:true});}});
       });
-      state.audioTracks.forEach(function(track){if(commentaries.length&&liveSelected||international&&Views.commentaryTitle(state.channelTitle)&&/^(eng|en)$/.test(track.language))return;choices.push({label:(track.id===state.audioTrackId?'✓ ':'')+track.label,run:function(){if(track.id!==state.audioTrackId)changeView({audioTrackId:track.id});}});});
+      state.audioTracks.forEach(function(track){if(commentaries.length&&Views.commentaryTitle(state.channelTitle)&&/^(eng|en)$/.test(track.language))return;choices.push({label:(track.id===state.audioTrackId?'✓ ':'')+track.label,run:function(){if(track.id!==state.audioTrackId)changeView({audioTrackId:track.id});}});});
       if(message)choices.push({label:'Bandyti dar kartą',run:selectAudio});
       dialog('Kalba ir garsas',message?'Komentavimo kanalų nepavyko gauti. Esamo srauto garso takelius gali pasirinkti.':commentaries.length?'F1 Live pasirenkamas automatiškai. International ir kitas kalbas gali pasirinkti ranka. Pakeitimas gali užtrukti kelias sekundes.':state.audioTracks.length?'Rodomos tik šio F1 srauto pateikiamos kalbos ir garso takeliai. Pakeitimas gali užtrukti kelias sekundes.':'Šio srauto garso pasirinkimas neprieinamas.',choices);
     }

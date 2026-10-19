@@ -58,7 +58,7 @@ test('explicit manual International and POV selections are preserved without a n
 });
 test('F1 Live has one selected audio choice; English International remains a manual action',async()=>{
   const p=choicesContext();p.c.activePlayback.channelId='1033';p.c.activePlayback.channelTitle='F1 Live';p.c.selectAudio();await flush();const labels=p.dialog[2].map(c=>c.label);
-  assert.ok(labels.includes('✓ F1 Live'));assert.ok(labels.includes('Anglų · International'));assert.equal(labels.filter(x=>x.startsWith('✓ ')).length,1);assert.equal(labels.includes('Prancūzų'),false);
+  assert.ok(labels.includes('✓ F1 Live'));assert.ok(labels.includes('Anglų · International'));assert.equal(labels.filter(x=>x.startsWith('✓ ')).length,1);assert.ok(labels.includes('Prancūzų'),'other service languages stay selectable while F1 Live is active');assert.equal(labels.includes('Anglų'),false);
   p.dialog[2].find(c=>c.label==='Anglų · International').run();assert.deepEqual(JSON.parse(JSON.stringify(p.changed)),{channelId:'1025',channelTitle:'International',audioLanguage:'eng',commentary:true});
 });
 function startup(){
