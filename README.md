@@ -80,17 +80,24 @@ with your model, Tizen version and playback results.
 
 ## Interface
 
-The following screenshots show earlier interface versions using sample data.
-They illustrate the app's layout and controls; they are not playback evidence.
-The current release includes the interface changes described in the [changelog](CHANGELOG.md).
+Version **0.5.11**, captured from the released interface at 1920 × 1080.
+These browser previews use sample catalogue data, illustrative session times
+and public F1 artwork. They contain no real account details or playback footage.
 
-| Home | Player timeline |
+| Home and upcoming sessions | Highlights and shows |
 | --- | --- |
-| ![Home interface preview](docs/screenshots/home-en.jpg) | ![Remote timeline preview](docs/screenshots/timeline-en.png) |
+| ![Apex TV 0.5.11 Home with F1 artwork and upcoming sessions](docs/screenshots/v0.5.11/home-en.jpg) | ![Apex TV 0.5.11 highlights catalogue](docs/screenshots/v0.5.11/highlights-en.jpg) |
 
-| Sign-in | Highlights and shows |
+| Playback settings | Player controls and timeline |
 | --- | --- |
-| ![Sign-in interface preview](docs/screenshots/login-clean.jpg) | ![Highlights and shows preview](docs/screenshots/highlights-en.png) |
+| ![Apex TV 0.5.11 categorized playback settings](docs/screenshots/v0.5.11/settings-en.jpg) | ![Apex TV 0.5.11 player controls without video footage](docs/screenshots/v0.5.11/timeline-en.jpg) |
+
+| Sign-in | Startup screen |
+| --- | --- |
+| ![Apex TV 0.5.11 phone sign-in entry screen](docs/screenshots/v0.5.11/login-en.jpg) | ![Apex TV 0.5.11 centered startup wordmark and loading indicator](docs/screenshots/v0.5.11/startup-en.jpg) |
+
+[Full-size screenshots and capture details](docs/screenshots/v0.5.11/README.md).
+The startup screen is part of the installed WGT, rather than the remote menu update.
 
 ## Remote controls
 
