@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { Releases } from '../companion/releases.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const required = ['config.xml','index.html','icon.png','boot.js','boot.css','menu-cache.js','connection.js'];
+const required = ['config.xml','index.html','icon.png','boot.js','boot.css','menu-cache.js','connection.js','legacy-polyfills.js'];
 const privacyPattern = /(?:-----BEGIN (?:RSA |EC |ENCRYPTED )?PRIVATE KEY-----|eyJ[A-Za-z0-9_-]{15,}\.[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,})/;
 const tables = Array.from({length:256}, (_, n) => { for(let i=0;i<8;i++) n=n&1?0xedb88320^(n>>>1):n>>>1; return n>>>0; });
 const crc32 = bytes => { let n=0xffffffff; for(const b of bytes)n=tables[(n^b)&255]^(n>>>8); return (n^0xffffffff)>>>0; };

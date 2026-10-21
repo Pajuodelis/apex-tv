@@ -186,6 +186,12 @@ window.ApexProtectionProbe = {
   var stack = [], current = { tab: 'home', title: 'Pradžia' }, account = null;
   var pendingRequest = 0, playing = false, epoch = 0, playbackKind = '', hideTimer = 0, overlayDismissed = false, tracks = [];
   var nativePlayer = window.webapis && webapis.avplay;
+  // Tizen 5.0/5.5 (2019/2020): no tizentvwasm sockets and no Elementary Media; AVPlay plays the F1 DASH URL directly.
+  var legacyTizen = /Tizen[\/ ]5\.[05](?:\D|$)/i.test(navigator.userAgent);
+  var localRelaySupported = Boolean(window.tizentvwasm) && typeof BigInt === 'function';
+  // Tizen 5.x engine: 'avplay' (default, Samsung native + Widevine) or 'browser' (dash.js + MSE/EME with the CBCS audio fix).
+  function legacyEngine(){try{return localStorage.getItem('apex-legacy-engine')==='browser'?'browser':'avplay';}catch(_){return 'avplay';}}
+  function setLegacyEngine(value){try{localStorage.setItem('apex-legacy-engine',value==='browser'?'browser':'avplay');}catch(_){}}
   var browserPlayer = null, activeEngine = '', prepareTimer = 0, localRelay = null;
   var commandBusy = false, lastCommand = '';
   var renderedView = null, awaitingCatalogFocus = null;
@@ -942,6 +948,7 @@ window.ApexProtectionProbe = {
     if(tryRecovery(message,activePlayback))return;
     if(setupProbe){setupStore.test(setupProbe.kind,'failed',setupProbe.runtime,setupProbe);setupProbe=null;}
     var failed=activePlayback;stopPlayback(); error(root.querySelector('main'),message,failed?function(){startContent(failed.item,failed.compatibilityStart,UX.resume(localStore.get(failed.item.id))||failed.resumeAt,{channelId:failed.channelId,channelTitle:failed.channelTitle,audioTrackId:failed.audioTrackId,videoQuality:failed.videoQuality});}:render);
+    if(failed&&legacyTizen&&nativePlayer&&!failed.stream.relayed){var other=legacyEngine()==='avplay'?'browser':'avplay',actions=root.querySelector('.error-actions');if(actions)actions.appendChild(button(other==='browser'?setupText('Bandyti suderinamumo grotuvą','Try compatibility player'):setupText('Bandyti Samsung AVPlay','Try Samsung AVPlay'),function(){setLegacyEngine(other);startContent(failed.item,failed.compatibilityStart,UX.resume(localStore.get(failed.item.id))||failed.resumeAt,{channelId:failed.channelId,channelTitle:failed.channelTitle,audioTrackId:failed.audioTrackId,videoQuality:failed.videoQuality});},'secondary-button'));}
     if(failed&&failed.videoQuality==='best'){var panel=root.querySelector('.error-actions');if(panel)panel.appendChild(button('Bandyti su 720p',function(){saveQuality('720p');startContent(failed.item,failed.compatibilityStart,UX.resume(localStore.get(failed.item.id))||failed.resumeAt,{channelId:failed.channelId,channelTitle:failed.channelTitle,audioTrackId:failed.audioTrackId,videoQuality:'720p'});},'secondary-button'));}
   }
   function releaseNativeSurface() {
@@ -1214,7 +1221,7 @@ window.ApexProtectionProbe = {
   }
   function begin(stream, title, kind) {
     resetPlayerTimeline(kind);
-    if (ctx.standalone && !ctx.testCompanion && kind !== 'demo' && !stream.localTV && stream.manifestXML && window.ApexTVMedia && nativePlayer) {
+    if (ctx.standalone && !ctx.testCompanion && kind !== 'demo' && !stream.localTV && stream.manifestXML && window.ApexTVMedia && nativePlayer && localRelaySupported) {
       if (playing) stopPlayback();
       playing = true; playbackKind = kind; var localGeneration = ++epoch;
       clearInterval(liveTimer);artworkLoader.reset();motion.cancel();root.hidden = true; document.body.classList.add('playing');
@@ -1259,7 +1266,11 @@ window.ApexProtectionProbe = {
     }
     // Samsung's native stack is the default for this TV; MSE remains a measured diagnostic.
     var preferSamsung = nativePlayer && stream.drm === 'widevine' && /Tizen[\/ ]6\.0(?:\D|$)/i.test(navigator.userAgent);
-    if (kind !== 'demo' && window.dashjs && window.MediaSource && ((!nativePlayer && !stream.drm) || ((!preferSamsung || stream.compatibilityStart) && !stream.relayed))) {
+    if (legacyTizen && nativePlayer && kind !== 'demo' && !stream.relayed) {
+      var legacyChoice = legacyEngine();
+      diagnostic('legacy_engine_selected', { engine: 'Tizen 5.x; ' + legacyChoice });
+      if (legacyChoice === 'browser' && window.dashjs && window.MediaSource) { beginBrowser(stream, kind, generation); return; }
+    } else if (kind !== 'demo' && window.dashjs && window.MediaSource && ((!nativePlayer && !stream.drm) || ((!preferSamsung || stream.compatibilityStart) && !stream.relayed))) {
       beginBrowser(stream, kind, generation); return;
     }
     activeEngine = nativePlayer ? 'AVPlay' : 'HTML';
@@ -1275,7 +1286,7 @@ window.ApexProtectionProbe = {
         surface.setAttribute('type', 'application/avplayer'); document.body.insertBefore(surface, video);
       }
       document.documentElement.classList.add('native-playing');
-      diagnostic('native_preparing', { engine: (stream.drm === 'widevine' ? 'AVPlay + Widevine' : 'AVPlay') + (stream.localTV ? ' + TV-local encrypted relay' : stream.relayed ? ' + PC encrypted relay' : '') });
+      diagnostic('native_preparing', { engine: (stream.drm === 'widevine' ? 'AVPlay + Widevine' : 'AVPlay') + (stream.localTV ? ' + TV-local encrypted relay' : stream.relayed ? ' + PC encrypted relay' : legacyTizen ? ' + Tizen 5.x direct DASH' : '') });
       nativePlayer.open(stream.manifestUrl);
       nativePlayer.setDisplayRect(0, 0, 1920, 1080);
       nativePlayer.setDisplayMethod('PLAYER_DISPLAY_MODE_LETTER_BOX');

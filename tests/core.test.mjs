@@ -67,7 +67,7 @@ test('updates are signed and published assets remain immutable',async(t)=>{
   await fs.writeFile(path.join(scratch,'web/tv.css'),'body{}');
   await fs.writeFile(path.join(scratch,'web/vendor/qrcode.js'),'/* QR fixture */');await fs.writeFile(path.join(scratch,'web/setup-checks.js'),'/* setup fixture */');
   const added=['i18n.js','timeline.js','ui-performance.js','discovery.js','editorial.js','playback-health.js','favorite-driver.js','online-updates.js'];for(const name of added)await fs.writeFile(path.join(scratch,'web',name),'/* '+name+' fixture */');const prefix='/* QR fixture */\n;\n/* setup fixture */\n;\n'+added.map(name=>'/* '+name+' fixture */\n;\n').join('');
-  const releases=new Releases(scratch,keys.privateKey);
+  const releases=new Releases(scratch,keys.privateKey,{lower:false});
   const first=await releases.publish();
   assert.equal(crypto.verify('RSA-SHA256',Buffer.from(first.manifest.payload,'base64'),keys.publicKey,Buffer.from(first.manifest.signature,'base64')),true);
   assert.equal(crypto.verify('RSA-SHA256',Buffer.from('tampered'),keys.publicKey,Buffer.from(first.manifest.signature,'base64')),false);
@@ -708,4 +708,11 @@ test('Samsung WASM capability inspection distinguishes missing, legacy and versi
   assert.match(inspect({WebAssembly:{},tizentvwasm:{availableApis:Object.freeze([entry])}}),/EMSS=1.2; levels=1/);
   assert.match(inspect({tizentvwasm:{isApiSupported:(name,level)=>level===0}}),/level1=false; EMSS legacy=true/);
   assert.match(inspect({tizentvwasm:{isApiSupported:()=>{throw new TypeError('Unavailable');}}}),/capabilityError=TypeError/);
+});
+test('Tizen 5.x releases are lowered to Chromium 63 syntax before signing',async(t)=>{
+  const {lowerJS,lowerCSS}=await import('../tools/legacy.mjs');
+  const js=(await lowerJS('try{a?.b??c}catch{d()}')).toString();
+  assert.equal(/\?\.|\?\?|catch\s*\{/.test(js),false);
+  const css=(await lowerCSS('.x{inset:0}')).toString();
+  assert.equal(css.includes('inset'),false);assert.ok(css.includes('top:0'));
 });
