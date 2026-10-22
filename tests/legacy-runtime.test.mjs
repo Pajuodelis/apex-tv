@@ -20,3 +20,10 @@ test('relay eligibility preserves worker-only Tizen 6+ sockets and excludes lega
  const app=await fs.readFile(new URL('../web/tv-app.js',import.meta.url),'utf8'),start=app.indexOf('  var legacyTizen ='),end=app.indexOf('  var browserPlayer',start);assert.ok(start>=0&&end>start);
  for(const [ua,bigint,expected] of [['Tizen 5.0',undefined,false],['Tizen 5.5',undefined,false],['Tizen 6.0',BigInt,true],['Tizen 9.0',BigInt,true]]){const c=vm.createContext({navigator:{userAgent:ua},window:{},BigInt:bigint});vm.runInContext(app.slice(start,end),c);assert.equal(c.localRelaySupported,expected,ua);}
 });
+
+test('installed shell passes its build timestamp to the updater rollback floor',async()=>{
+ for(const name of ['boot.js','boot-standalone.js']){
+  const nodes=new Map();function node(){return{hidden:false,focus(){}};}const c=vm.createContext({Promise,setTimeout(){},setInterval(){},localStorage:{getItem(){return null;}},document:{getElementById(id){if(!nodes.has(id))nodes.set(id,node());return nodes.get(id);},createElement(){return node();},head:{appendChild(el){Promise.resolve().then(()=>el.onload());}},body:{classList:{contains(){return false;}}}},APEX_CONFIG:{server:'',onlineUpdates:false},APEX_BUNDLED:{revision:'bundled',version:'0.5.11',builtAt:200},ApexMenuCache:{localServer(){return '';},cache(){return Promise.resolve(null);}},ApexStandalone:{initialize(){return Promise.resolve();}},ApexTV:{start(){}}});c.window=c;
+  vm.runInContext(await fs.readFile(new URL('../tv/'+name,import.meta.url),'utf8'),c);await new Promise(r=>setImmediate(r));assert.equal(c.APEX_CONTEXT.builtAt,200,name);assert.equal(nodes.get('boot').hidden,true,name);
+ }
+});

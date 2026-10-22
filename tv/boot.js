@@ -6,7 +6,7 @@ function fail(message){document.getElementById("boot").className="boot-error";st
 document.getElementById('boot-retry').onclick=function(){location.reload();};
 function load(tag,url){return new Promise(function(resolve,reject){var e=document.createElement(tag);if(tag==='link'){e.rel='stylesheet';e.href=url;}else e.src=url;e.onload=function(){resolve();};e.onerror=function(){reject(Error('Nepavyko įkelti TV išsaugoto meniu.'));};document.head.appendChild(e);});}
 function start(m,bundle){
-window.APEX_CONTEXT={server:server||cfg.server,key:cfg.pairingKey,revision:m.revision,version:m.version,standalone:true,monitor:false,preview:false,nativeFileProbe:false};
+window.APEX_CONTEXT={server:server||cfg.server,key:cfg.pairingKey,revision:m.revision,version:m.version,builtAt:m.builtAt,standalone:true,monitor:false,preview:false,nativeFileProbe:false};
 var css=bundle?URL.createObjectURL(new Blob([bundle.files['tv.css']],{type:'text/css'})):'menu/tv.css',js=bundle?URL.createObjectURL(new Blob([bundle.files['tv-app.js']],{type:'text/javascript'})):'menu/tv-app.js';
 return load('link',css).then(function(){return load('script',js);}).then(function(){if(!window.ApexTV||!window.ApexStandalone)throw Error('Meniu versija nesuderinama.');return ApexStandalone.initialize().catch(function(){return null;});}).then(function(){active=true;document.getElementById('boot').hidden=true;document.getElementById('app').hidden=false;ApexTV.start();optionalPC();}).finally(function(){if(bundle){URL.revokeObjectURL(css);URL.revokeObjectURL(js);}});
 }
