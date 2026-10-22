@@ -370,6 +370,8 @@ window.ApexProtectionProbe = {
   function saveQuality(value){preferredQuality=Quality.mode(value);try{localStorage.setItem('apex-video-quality',preferredQuality);}catch(_){}}
   var Views=window.ApexViewOptions, viewBusy=false, preferredAudioLanguage="";
   try{var savedAudioLanguage=localStorage.getItem("apex-audio-language");preferredAudioLanguage=savedAudioLanguage?Views.language(savedAudioLanguage):"";}catch(_){}
+  // Only a manual International choice is remembered; F1 Live stays the default otherwise.
+  var preferredCommentary="";try{preferredCommentary=localStorage.getItem("apex-commentary")==="International"?"International":"";}catch(_){}
   var scrubber=window.ApexTimeline.controller(),scrubPaintFrame=0;
   function scrubRange(sample){if(!sample)return null;if(playbackKind==='live'){var live=getLiveWindow(sample.position);return live&&live.edge>live.start?{start:live.start,end:live.edge,live:true}:null;}return sample.duration>1?{start:0,end:Math.max(0,sample.duration-1),live:false}:null;}
   function startScrub(){if(!playing||seekBusy||viewBusy)return false;var m=lastMetrics||metrics();return scrubber.begin(scrubRange(m),m&&m.position);}
@@ -831,7 +833,7 @@ window.ApexProtectionProbe = {
     if (account && account.signedIn) {
       var summary = node('div', '', 'account-summary'), copy = node('div'); copy.appendChild(node('h2', 'F1 TV paskyra'));
       copy.appendChild(node('p', 'Prisijungta · ' + account.country)); summary.appendChild(copy);
-      summary.appendChild(focusKey(button('Atsijungti', function () { dialog('Atsijungti nuo F1 TV?','Šiame TV bus pašalinta F1 sesija, žiūrėjimo istorija ir mėgstami įrašai.',[{label:'Atšaukti',default:true},{label:'Atsijungti',run:function(){window.ApexStandalone.signOut().then(function(){localStore.clearAccount();setupStore.clearAccount();setupCatalogue={status:"untested"};catalogueCache.clear();editorialCache={};editorialPending={};driverStore.clear();weekendData=null;preferredAudioLanguage="";try{localStorage.removeItem("apex-audio-language");}catch(_){}stack=[];refreshAccount();}).catch(function(e){error(root.querySelector('main'),e.message);});}}]); }, 'secondary-button'), 'account-signout')); box.appendChild(summary);
+      summary.appendChild(focusKey(button('Atsijungti', function () { dialog('Atsijungti nuo F1 TV?','Šiame TV bus pašalinta F1 sesija, žiūrėjimo istorija ir mėgstami įrašai.',[{label:'Atšaukti',default:true},{label:'Atsijungti',run:function(){window.ApexStandalone.signOut().then(function(){localStore.clearAccount();setupStore.clearAccount();setupCatalogue={status:"untested"};catalogueCache.clear();editorialCache={};editorialPending={};driverStore.clear();weekendData=null;preferredAudioLanguage="";preferredCommentary="";try{localStorage.removeItem("apex-audio-language");localStorage.removeItem("apex-commentary");}catch(_){}stack=[];refreshAccount();}).catch(function(e){error(root.querySelector('main'),e.message);});}}]); }, 'secondary-button'), 'account-signout')); box.appendChild(summary);
     } else {
       box.classList.add('login-panel');
       var mark=node('div','F1','login-mark');mark.setAttribute('aria-hidden','true');box.appendChild(mark);
@@ -1396,7 +1398,7 @@ window.ApexProtectionProbe = {
   function prepareViewPlayback(item,stream,compatibilityStart,resumeAt,options) {
     options=options||{};var choices=streamAudioChoices(stream),id=stream.audioTrackId||options.audioTrackId||'',chosen=choices.filter(function(t){return t.id===id;})[0];
     if(id&&!chosen)throw Error('F1 nepateikė pasirinkto garso takelio.');
-    if(!chosen)chosen=choices.filter(function(t){return t.language===preferredAudioLanguage;})[0]||choices.filter(function(t){return /^(eng|en)$/.test(t.language);})[0]||choices[0];
+    if(!chosen)chosen=choices.filter(function(t){return t.language===preferredAudioLanguage;})[0]||choices.filter(function(t){return preferredAudioLanguage&&Views.family(t.language)===Views.family(preferredAudioLanguage);})[0]||choices.filter(function(t){return /^(eng|en)$/.test(t.language);})[0]||choices[0];
     stream.audioTrackId=chosen?chosen.id:'';stream.videoQuality=Quality.mode(options.videoQuality||stream.videoQuality||preferredQuality);
     return {item:item,stream:stream,videoQuality:stream.videoQuality,bestBandwidth:stream.selectedVideo&&stream.selectedVideo.bandwidth,bestHeight:stream.selectedVideo&&stream.selectedVideo.height,compatibilityStart:compatibilityStart,resumeAt:resumeAt||0,resumeApplied:false,channelId:String(stream.channelId||options.channelId||''),channelTitle:String(options.channelTitle||'').slice(0,120),audioTracks:choices,audioTrackId:chosen?chosen.id:'',audioLanguage:chosen?chosen.language:''};
   }
@@ -1437,11 +1439,27 @@ window.ApexProtectionProbe = {
     function showChoices(data,message){
       if(generation!==epoch||current!==view||state!==activePlayback)return;viewBusy=false;updateViewControls();
       var channels=Views.channels(data);if(!message)catalogueCache.put(route,channels);
-      var commentaries=Views.commentaryChannels({channels:channels}),choices=[{label:'Grįžti',default:true}],chosen=state.audioTracks.filter(function(track){return track.id===state.audioTrackId;})[0],international=commentaries.some(function(channel){return channel.title==='International';}),liveSelected=Views.commentaryTitle(state.channelTitle)==='F1 Live';
-      commentaries.forEach(function(channel){var selected=(state.channelId===channel.id||!state.channelId&&channel.default)&&(channel.title!=='International'||!chosen||/^(eng|en)$/.test(chosen.language));
+      var commentaries=Views.commentaryChannels({channels:channels}),choices=[{label:'Grįžti',default:true}],chosen=state.audioTracks.filter(function(track){return track.id===state.audioTrackId;})[0];
+      commentaries.forEach(function(channel){var selected=(state.channelId===channel.id||!state.channelId&&channel.default)&&(!chosen||Views.family(chosen.language)==='en');
         choices.push({label:(selected?'✓ ':'')+(channel.title==='International'?'Anglų · International':channel.title),run:function(){if(!selected)changeView({channelId:channel.id,channelTitle:channel.title,audioLanguage:'eng',commentary:true});}});
       });
-      state.audioTracks.forEach(function(track){if(commentaries.length&&liveSelected||international&&Views.commentaryTitle(state.channelTitle)&&/^(eng|en)$/.test(track.language))return;choices.push({label:(track.id===state.audioTrackId?'✓ ':'')+track.label,run:function(){if(track.id!==state.audioTrackId)changeView({audioTrackId:track.id});}});});
+      var intl=commentaries.filter(function(channel){return channel.title==='International';})[0],others=state.audioTracks.filter(function(track){return Views.family(track.language)!=='en';});
+      function languageMenu(tracks,pick){var list=[{label:'Grįžti',default:true,run:selectAudio}];tracks.forEach(function(track){list.push({label:(track.id===state.audioTrackId?'✓ ':'')+track.label,run:function(){pick(track);}});});dialog('Kalbos','Pasirink komentatorių kalbą. Pakeitimas gali užtrukti kelias sekundes.',list);}
+      function pickHere(track){if(track.id!==state.audioTrackId)changeView(Object.assign({audioTrackId:track.id},Views.commentaryTitle(state.channelTitle)==='International'?{commentary:true}:{}));}
+      function pickInternational(track){changeView({channelId:intl.id,channelTitle:intl.title,audioLanguage:track.language,commentary:true});}
+      // F1 Live carries English only; other languages ride on International. Read them from the current stream when present, otherwise ask the service for International's tracks.
+      function openLanguages(){
+        if(others.length&&(!intl||state.channelId===intl.id))return languageMenu(others,pickHere);
+        dialog('Kalbos','Gaunamos F1 kalbos…',[{label:'Grįžti',default:true,run:selectAudio}]);var loadingDialog=modal;
+        function stillWaiting(){return generation===epoch&&current===view&&activePlayback===state&&!document.hidden&&modal===loadingDialog;}
+        request('/api/play','POST',{id:state.item.id,channelId:intl.id,audioTrackId:'',audioLanguage:'eng'}).then(function(stream){
+          if(!stillWaiting())return;
+          var found=streamAudioChoices(stream).filter(function(track){return Views.family(track.language)!=='en';});
+          if(found.length)languageMenu(found,pickInternational);else dialog('Kalbos','F1 šiam įrašui kitų kalbų nepateikė.',[{label:'Grįžti',default:true,run:selectAudio}]);
+        }).catch(function(){if(!stillWaiting())return;dialog('Kalbos','Kalbų sąrašo gauti nepavyko.',[{label:'Grįžti',default:true,run:selectAudio},{label:'Bandyti dar kartą',run:openLanguages}]);});
+      }
+      if(commentaries.length){if(others.length||intl)choices.push({label:'Kalbos…',run:openLanguages});}
+      else state.audioTracks.forEach(function(track){choices.push({label:(track.id===state.audioTrackId?'✓ ':'')+track.label,run:function(){if(track.id!==state.audioTrackId)changeView({audioTrackId:track.id});}});});
       if(message)choices.push({label:'Bandyti dar kartą',run:selectAudio});
       dialog('Kalba ir garsas',message?'Komentavimo kanalų nepavyko gauti. Esamo srauto garso takelius gali pasirinkti.':commentaries.length?'F1 Live pasirenkamas automatiškai. International ir kitas kalbas gali pasirinkti ranka. Pakeitimas gali užtrukti kelias sekundes.':state.audioTracks.length?'Rodomos tik šio F1 srauto pateikiamos kalbos ir garso takeliai. Pakeitimas gali užtrukti kelias sekundes.':'Šio srauto garso pasirinkimas neprieinamas.',choices);
     }
@@ -1462,7 +1480,8 @@ window.ApexProtectionProbe = {
       var m=metrics()||lastMetrics||{position:previous.resumeAt,paused:false},next=prepareViewPlayback(previous.item,stream,previous.compatibilityStart,previous.item.live?0:m.position,{channelId:channelId,channelTitle:channelTitle,audioTrackId:options.audioTrackId||(options.videoQuality?previous.audioTrackId:undefined),videoQuality:qualityMode});
       next.restoreAfterSwitch=true;next.pausedAtStart=m.paused;next.returnFocus=options.automatic?'':options.videoQuality?'player-more':(options.audioTrackId||options.commentary)?'player-audio':'player-camera';var liveBefore=previous.item.live&&getLiveWindow(m.position);next.liveResumeDelay=liveBefore?liveBefore.delay:previous.liveResumeDelay||0;next.bestBandwidth=previous.bestBandwidth;next.bestHeight=previous.bestHeight;stream.compatibilityStart=Boolean(previous.compatibilityStart)&&!stream.relayed&&!stream.nativeTest;
       if(current.video&&current.video.id===next.item.id){current.channelId=next.channelId;current.channelTitle=next.channelTitle;}stopPlayback(false,true);activePlayback=next;lastMetrics=null;lastSaved=Date.now();
-      if(options.audioTrackId&&next.audioLanguage){preferredAudioLanguage=next.audioLanguage;try{localStorage.setItem('apex-audio-language',preferredAudioLanguage);}catch(_){}}
+      if((options.audioTrackId||options.commentary)&&next.audioLanguage){preferredAudioLanguage=next.audioLanguage;try{localStorage.setItem('apex-audio-language',preferredAudioLanguage);}catch(_){}}
+      if(options.commentary){preferredCommentary=Views.commentaryTitle(channelTitle)==='International'?'International':'';try{localStorage.setItem('apex-commentary',preferredCommentary);}catch(_){}}
       if(options.videoQuality&&!options.automatic)saveQuality(qualityMode);
       if(options.videoQuality)playbackHealth.switched(qualityMode,options.automatic===true);
       diagnostic(options.videoQuality?'quality_changed':options.audioTrackId?'audio_changed':options.commentary?'commentary_changed':'camera_changed',{engine:options.videoQuality?qualityMode:options.audioTrackId?next.audioLanguage:'channel='+next.channelId});
@@ -1562,7 +1581,8 @@ window.ApexProtectionProbe = {
     if(options.channelId)return Promise.resolve(Views.commentaryTitle(options.channelTitle)==='F1 Live'?Object.assign({},options,{audioLanguage:'eng'}):options);
     var route='/api/channels?id='+encodeURIComponent(item.id),cached=catalogueCache.get(route,120000);
     return (cached?Promise.resolve({channels:cached.items}):request(route)).then(function(data){
-      var channels=Views.channels(data);catalogueCache.put(route,channels);var live=Views.defaultCommentary({channels:channels});
+      var channels=Views.channels(data);catalogueCache.put(route,channels);var live=Views.defaultCommentary({channels:channels}),intl=preferredCommentary==='International'?Views.commentaryChannels({channels:channels}).filter(function(c){return c.title==='International';})[0]:null;
+      if(intl)return Object.assign({},options,{channelId:intl.id,channelTitle:intl.title,audioLanguage:preferredAudioLanguage||'eng'});
       return live?Object.assign({},options,{channelId:live.id,channelTitle:live.title,audioLanguage:'eng'}):options;
     }).catch(function(){return options;});
   }
