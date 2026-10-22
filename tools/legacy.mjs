@@ -1,4 +1,4 @@
-// Tizen 5.5 (2020 Samsung TVs) runs Chromium 63, i.e. ES2017 plus object spread.
+// Tizen 5.0 (2019 Samsung TVs) runs Chromium 63; Tizen 5.5 uses Chromium 69, i.e. ES2017 plus object spread.
 // Every JS/CSS file that reaches the TV goes through this step so newer syntax
 // (optional chaining, ??, optional catch binding, class fields, logical
 // assignment, CSS `inset`, nesting, ...) is lowered before it is signed.

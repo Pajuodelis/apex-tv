@@ -1,4 +1,4 @@
-/* Apex TV legacy runtime for Samsung Tizen 5.5 (Chromium 63, ES2017).
+/* Apex TV legacy runtime for Samsung Tizen 5.0/5.5 (Chromium 63/69).
    Loaded by index.html before the boot loader and the signed menu.
    Every polyfill is guarded: on Tizen 6+ the native implementation wins.
    Keep this file ES5 so it can never be the cause of a boot SyntaxError. */
@@ -28,7 +28,10 @@
         if (done) return { value: undefined, done: true };
         var match = re.exec(text);
         if (match === null) { done = true; return { value: undefined, done: true }; }
-        if (match[0] === '') re.lastIndex++;
+        if (match[0] === '') {
+          var n=re.lastIndex, first=text.charCodeAt(n), second=text.charCodeAt(n+1);
+          re.lastIndex += re.unicode && first>=0xD800 && first<=0xDBFF && second>=0xDC00 && second<=0xDFFF ? 2 : 1;
+        }
         return { value: match, done: false };
       }
     };
@@ -40,7 +43,8 @@
       if (search.flags.indexOf('g') < 0) throw new TypeError('replaceAll requires a global RegExp');
       return String(this).replace(search, replacement);
     }
-    return String(this).split(String(search)).join(typeof replacement === 'function' ? replacement(String(search)) : String(replacement));
+    var escaped = String(search).replace(/[.*+?^${}()|[\]\\]/g, function(ch) { return '\\' + ch; });
+    return String(this).replace(new RegExp(escaped, 'g'), replacement);
   });
 
   /* --- Array / Object (Chrome 69 / 73 / 92 / 93) --- */
@@ -60,7 +64,7 @@
   define(String.prototype, 'at', function (index) { return at.call(String(this), index); });
   define(Object, 'fromEntries', function (entries) {
     var result = {};
-    Array.from(entries, function (pair) { result[pair[0]] = pair[1]; });
+    Array.from(entries, function (pair) { Object.defineProperty(result, pair[0], {value:pair[1],writable:true,enumerable:true,configurable:true}); });
     return result;
   });
   define(Object, 'hasOwn', function (object, key) { return Object.prototype.hasOwnProperty.call(object, key); });
@@ -68,6 +72,7 @@
   /* --- Promise (finally = Chrome 63, allSettled = Chrome 76, any = Chrome 85) --- */
   if (typeof Promise === 'function') {
     define(Promise.prototype, 'finally', function (callback) {
+      if (typeof callback !== 'function') return this.then(callback, callback);
       var P = this.constructor || Promise;
       return this.then(
         function (value) { return P.resolve(callback()).then(function () { return value; }); },

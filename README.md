@@ -69,11 +69,11 @@ retrieved its own media and DRM licenses; replay playback was also checked
 with the optional companion server stopped. Version 0.5.11 was tested on this
 TV with retained sign-in, smooth menu navigation, picture and sound.
 
-**Tested Tizen 5.5 hardware:** Samsung UN43TU7000GXZD (2020). F1 picture and
+**Contributor-reported Tizen 5.5 hardware:** Samsung UN43TU7000GXZD (2020). F1 picture and
 sound were confirmed with the in-app setup check using native AVPlay +
 Widevine; a long live session (DRM key rotation) has not been verified yet.
 
-Tizen 6.0 is the package's minimum requirement, not a guarantee for every TV.
+The package now targets Tizen 5.0 or later; this does not guarantee playback on every TV.
 Physical Tizen 9 testing, additional models and regions, long-session stability
 and DRM key rotation remain areas for further validation. The documented
 Apps2Samsung route has not been independently verified end to end on another

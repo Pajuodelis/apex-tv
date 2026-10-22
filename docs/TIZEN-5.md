@@ -6,7 +6,7 @@ Samsung documents **Tizen 5.0 (2019)** as **Chromium 63** and **Tizen 5.5 (2020)
 **Chromium 69**. The TV package targets `chrome63`, the lower of the two, so one `.wgt`
 serves both.
 
-## Verified device
+## Contributor-reported device test
 
 | Field | Value |
 | --- | --- |
@@ -20,13 +20,17 @@ serves both.
 
 Tizen 5.0 (2019) has not been tested on a real TV yet.
 
+This report describes the contributor’s build, not a fresh test of later integration changes.
+Replay versus live content was not recorded. Tizen 6+ also requires regression testing
+after integration; automated checks alone do not prove playback.
+
 ## What changed
 
 | Area | Change |
 | --- | --- |
 | Transpilation | `tools/legacy.mjs` runs the assembled `tv-app.js` and `tv.css` through **esbuild** with `target: chrome63` before hashing and signing, both for the bundled menu and for published online updates. It lowers `?.`, `??`, optional `catch {}` binding, class fields, `inset`, etc. |
 | Source | `web/f1-browser.js`: `catch {` → `catch (_unused) {` (the syntax error behind the black screen). |
-| Polyfills | `tv/legacy-polyfills.js`, loaded in `index.html` before `boot.js`: `globalThis`, `String.prototype.matchAll/replaceAll/trimStart/trimEnd/at`, `Array.prototype.flat/flatMap/at`, `Object.fromEntries/hasOwn`, `Promise.prototype.finally`, `Promise.allSettled`, `queueMicrotask`, `AbortController`/`AbortSignal` (+ a `fetch` that honours `signal`) and `AbortSignal.timeout`. Each polyfill is installed only when the native API is missing. |
+| Polyfills | `tv/legacy-polyfills.js`, loaded in `index.html` before `boot.js`: `globalThis`, `String.prototype.matchAll/replaceAll/trimStart/trimEnd/at`, `Array.prototype.flat/flatMap/at`, `Object.fromEntries/hasOwn`, `Promise.prototype.finally`, `Promise.allSettled`, `queueMicrotask`, `AbortController`/`AbortSignal` (+ caller-side fetch rejection on abort; the underlying request may continue) and `AbortSignal.timeout`. Each polyfill is installed only when the native API is missing. |
 | CSS | Flexbox `gap` arrived in Chromium 84. The polyfill sets `<html class="no-flexgap">` and `tv.css` falls back to margins. The compatibility grid also declares `grid-gap`. |
 | Player (AVPlay) | The TV-local relay (`tizentvwasm` sockets + `BigInt`) exists only on Tizen 6+. On Tizen 5.x the app opens the F1 DASH URL directly in `webapis.avplay` with Widevine. If playback fails, the error screen offers **Try compatibility player** (dash.js + MSE/EME with the CBCS audio fix). The choice is stored in `localStorage['apex-legacy-engine']`, and the same button switches back to AVPlay. Tizen 6+ behaviour is unchanged. |
 | Checks | `setup-checks.js` accepts Tizen 5.x. The new `tools/check-legacy.mjs` (run by `npm run build:tv`) fails the build if any script in the `.wgt` does not parse as Chromium 63 JavaScript. |

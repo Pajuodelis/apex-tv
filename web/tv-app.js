@@ -188,7 +188,8 @@ window.ApexProtectionProbe = {
   var nativePlayer = window.webapis && webapis.avplay;
   // Tizen 5.0/5.5 (2019/2020): no tizentvwasm sockets and no Elementary Media; AVPlay plays the F1 DASH URL directly.
   var legacyTizen = /Tizen[\/ ]5\.[05](?:\D|$)/i.test(navigator.userAgent);
-  var localRelaySupported = Boolean(window.tizentvwasm) && typeof BigInt === 'function';
+  // Socket capabilities are checked inside the worker; they need not exist on window.
+  var localRelaySupported = !legacyTizen && typeof BigInt === 'function';
   // Tizen 5.x engine: 'avplay' (default, Samsung native + Widevine) or 'browser' (dash.js + MSE/EME with the CBCS audio fix).
   function legacyEngine(){try{return localStorage.getItem('apex-legacy-engine')==='browser'?'browser':'avplay';}catch(_){return 'avplay';}}
   function setLegacyEngine(value){try{localStorage.setItem('apex-legacy-engine',value==='browser'?'browser':'avplay');}catch(_){}}

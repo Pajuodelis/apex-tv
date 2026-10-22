@@ -18,10 +18,11 @@ export class Releases {
     const experience = await fs.readFile(path.join(this.root, 'web/experience.js'));
     const viewOptions = await fs.readFile(path.join(this.root, 'web/view-options.js'));
     const qrCode=await fs.readFile(path.join(this.root,'web/vendor/qrcode.js'));
+    const runtime=this.lower?await fs.readFile(path.join(this.root,'tv/legacy-polyfills.js')):Buffer.alloc(0);
     const setupChecks=await fs.readFile(path.join(this.root,'web/setup-checks.js'));
     const enhancements=await Promise.all(['i18n.js','timeline.js','ui-performance.js','discovery.js','editorial.js','playback-health.js','favorite-driver.js','online-updates.js'].map(name=>fs.readFile(path.join(this.root,'web',name))));
     const videoQuality = await fs.readFile(path.join(this.root, 'web/video-quality.js'));
-    content[0] = Buffer.concat([qrCode,Buffer.from("\n;\n"),setupChecks,Buffer.from("\n;\n"),...enhancements.flatMap(bytes=>[bytes,Buffer.from('\n;\n')]),videoQuality, Buffer.from('\n;\n'), experience, Buffer.from('\n;\n'), viewOptions, Buffer.from('\n;\n'), player, Buffer.from('\n;\n'), tvClient, Buffer.from('\n;\n'), audioCompat, Buffer.from('\n;\n'), elementary, Buffer.from('\n;\n'), nativeRelay, Buffer.from('\n;\n'), dashManifest, Buffer.from('\n;\n'), tvMedia, Buffer.from('\n;\n'), content[0]]);
+    content[0] = Buffer.concat([...(this.lower?[runtime,Buffer.from('\n;\n')]:[]),qrCode,Buffer.from("\n;\n"),setupChecks,Buffer.from("\n;\n"),...enhancements.flatMap(bytes=>[bytes,Buffer.from('\n;\n')]),videoQuality, Buffer.from('\n;\n'), experience, Buffer.from('\n;\n'), viewOptions, Buffer.from('\n;\n'), player, Buffer.from('\n;\n'), tvClient, Buffer.from('\n;\n'), audioCompat, Buffer.from('\n;\n'), elementary, Buffer.from('\n;\n'), nativeRelay, Buffer.from('\n;\n'), dashManifest, Buffer.from('\n;\n'), tvMedia, Buffer.from('\n;\n'), content[0]]);
     // Tizen 5.5 / Chromium 63: lower the assembled menu and stylesheet to ES2017 before hashing and signing.
     if (this.lower) { content[0] = await lowerJS(content[0], 'tv-app.js'); content[1] = await lowerCSS(content[1], 'tv.css'); }
     const revision = crypto.createHash('sha256').update(Buffer.concat(content)).digest('hex').slice(0, 24);

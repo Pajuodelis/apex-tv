@@ -15,6 +15,7 @@ const contents=[
 let count=0;
 async function walk(directory) {
   for(const item of await fs.readdir(directory,{withFileTypes:true})) {
+    if(item.name==='.git'&&item.isFile())continue; // Git worktrees store their metadata pointer in a file.
     if(item.isDirectory()){if(!skip.has(item.name))await walk(path.join(directory,item.name));continue;}
     const file=path.join(directory,item.name),relative=path.relative(root,file).replaceAll('\\','/');
     if(denied.test(relative))throw Error('Private or runtime file in source: '+relative);
