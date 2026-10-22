@@ -18,6 +18,6 @@
       pending=initializeFloor().then(function(){return load(SOURCE,false);}).catch(function(error){if(error.code!=='NETWORK'||!context.server||!root.ApexMenuCache.localServer(context.server))throw error;return load(context.server,true);}).finally(function(){pending=null;});return pending;},
       staged:function(){return staged;},source:SOURCE};
   }
-  function install(cfg,context,isIdle){if(!cfg||!root.ApexMenuCache||context.preview)return null;var updater=create(cfg,context,{busy:function(){return !isIdle();}});root.ApexUpdateMenu=function(options){var force=options&&options.force===true;return updater.check(force).then(function(result){context.updatePending=result.pending?result:null;context.updateAvailable=result.available?result:null;if(result.pending&&(force||isIdle())&&!root.document.body.classList.contains('playing'))root.location.reload();return result;});};return updater;}
+  function install(cfg,context,isIdle){if(!cfg||cfg.onlineUpdates===false||!root.ApexMenuCache||context.preview)return null;var updater=create(cfg,context,{busy:function(){return !isIdle();}});root.ApexUpdateMenu=function(options){var force=options&&options.force===true;return updater.check(force).then(function(result){context.updatePending=result.pending?result:null;context.updateAvailable=result.available?result:null;if(result.pending&&(force||isIdle())&&!root.document.body.classList.contains('playing'))root.location.reload();return result;});};return updater;}
   return{source:SOURCE,compare:compare,create:create,install:install};
 }));

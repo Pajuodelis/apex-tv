@@ -28,7 +28,7 @@
     let url;
     try {
       url = new URL(raw);
-    } catch {
+    } catch (_unused) {
       throw new ServiceError("F1 gr\u0105\u017Eino netinkam\u0105 vaizdo adres\u0105.");
     }
     const host = url.hostname.toLowerCase();
@@ -164,7 +164,7 @@
       let config;
       try {
         config = JSON.parse(text);
-      } catch {
+      } catch (_unused) {
         throw new ServiceError("F1 grotuvo apra\u0161as neatpa\u017Eintas.", 422);
       }
       if (String((_a = config.metadata) == null ? void 0 : _a.content_id) !== String(contentId) || !Array.isArray(config.feeds) || config.feeds.length > 64) throw new ServiceError("F1 grotuvo turinys nesutampa.", 422);
@@ -186,7 +186,7 @@
       let data;
       try {
         data = JSON.parse(text);
-      } catch {
+      } catch (_unused) {
         throw new ServiceError("F1 pateik\u0117 neatpa\u017Eint\u0105 atsakym\u0105.");
       }
       if (data.resultCode && data.resultCode !== "OK") throw new ServiceError("F1 atmet\u0117 u\u017Eklaus\u0105. Patikrink paskyros prieig\u0105.", 403);
@@ -200,7 +200,7 @@
       try {
         header = JSON.parse(new TextDecoder().decode(decode64(parts[0])));
         payload = JSON.parse(new TextDecoder().decode(decode64(parts[1])));
-      } catch {
+      } catch (_unused) {
         throw new ServiceError("Netinkama prisijungimo sesija.", 400);
       }
       if (header.alg !== "RS256" || typeof header.kid !== "string" || !Number.isFinite(payload.exp) || payload.exp <= Date.now() / 1e3 || payload.nbf && payload.nbf > Date.now() / 1e3) throw new ServiceError("Prisijungimo sesija negalioja arba pasibaig\u0117.", 401);
@@ -246,7 +246,7 @@
         try {
           const saved = await this.vault.load();
           if (saved) await this.signIn(saved, false);
-        } catch {
+        } catch (_unused) {
           this.error = "I\u0161saugota F1 sesija nebegalioja. Prisijunk i\u0161 naujo.";
         }
       }
@@ -275,7 +275,7 @@
         try {
           const latest = normalizeItems(await this.json(ORIGIN + "/2.0/" + ctx.login + "/ENG/WEB_DASH/ALL/PAGE/12343/" + ctx.tail, this.headers()));
           if (latest.some((item) => /2026/.test(item.title))) items.unshift({ id: "12343", title: "2026 Season", kind: "page", subtitle: "", duration: 0, live: false });
-        } catch {
+        } catch (_unused) {
         }
       }
       return items;
@@ -349,7 +349,7 @@
       const host = (url) => {
         try {
           return new URL(url).hostname;
-        } catch {
+        } catch (_unused) {
           return "";
         }
       };
@@ -359,14 +359,14 @@
         manifestRoute: (() => {
           try {
             return new URL(stream2.url || stream2.manifestUrl).pathname.split("/").slice(0, 12).map((part) => /^(?:\d+\.0|[A-Z_]+|)$/.test(part) ? part : "[value]").join("/");
-          } catch {
+          } catch (_unused) {
             return "";
           }
         })(),
         manifestQueryKeys: (() => {
           try {
             return [...new URL(stream2.url || stream2.manifestUrl).searchParams.keys()];
-          } catch {
+          } catch (_unused) {
             return [];
           }
         })(),
@@ -400,7 +400,7 @@
           try {
             const url = new URL(match[1].trim().replace(/&amp;/g, "&"), stream.manifestUrl);
             return { host: url.hostname, queryKeys: [...url.searchParams.keys()], relative: !/^https:\/\//i.test(match[1]) };
-          } catch {
+          } catch (_unused) {
             return { invalid: true };
           }
         });
