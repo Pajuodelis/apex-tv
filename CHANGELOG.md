@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- Add an International commentary language submenu, saved manual feed/language choices, and consistent language-code matching. Cancel stale lookups, clear account preferences on sign-out, and keep audio selections scoped to their feed.
+- Add a Chromium 63-compatible build and guarded runtime helpers for Tizen 5.0/5.5, with a direct AVPlay path on legacy TVs. Preserve the Tizen 6+ worker relay path and include runtime helpers in future signed menu bundles.
+- Contributor-reported Tizen 5.5 playback is documented separately from integration tests. Tizen 5.0 hardware and physical regression testing of the integrated changes remain pending.
+- These changes are source-only until a new release is tested and published. The public 0.5.11 downloads and signed update feed remain unchanged.
+
 ## 0.5.11 — 2026-10-15
 
 - Center the startup wordmark on a quiet static backdrop with a small CSS-only loading indicator. No external assets or minimum display delay; reduced-motion media preferences disable animation and failures retain the retry action. This first screen is part of the installed TV shell package.

@@ -107,3 +107,7 @@ test('late International language responses do not reopen a canceled, hidden or 
 test('F1 Live does not reuse another feed audio IDs when listing International languages',async()=>{
  const p=choicesContext({play:{audioTracks:[{id:'set:intl-fr',language:'fr',label:'French'}]}});p.c.activePlayback.channelId='1033';p.c.activePlayback.channelTitle='F1 Live';p.c.selectAudio();await flush();p.dialog[2].find(c=>c.label==='Kalbos…').run();await flush();assert.equal(p.playBody.channelId,'1025');p.dialog[2].find(c=>c.label==='French').run();assert.equal(p.changed.channelId,'1025');assert.equal(p.changed.audioLanguage,'fr');
 });
+
+test('International languages are not marked selected just because another feed reuses an audio ID',async()=>{
+ const p=choicesContext({play:{audioTracks:[{id:'set:en',language:'pt',label:'Portuguese'}]},tracks:[{id:'set:en',language:'eng',label:'English'}]});p.c.activePlayback.channelId='1033';p.c.activePlayback.channelTitle='F1 Live';p.c.selectAudio();await flush();p.dialog[2].find(c=>c.label==='Kalbos…').run();await flush();assert.ok(p.dialog[2].some(c=>c.label==='Portuguese'));assert.equal(p.dialog[2].some(c=>c.label==='✓ Portuguese'),false);
+});
