@@ -9,9 +9,9 @@ const source=await fs.readFile(new URL('../web/tv-app.js',import.meta.url),'utf8
 const channels=[{id:'1033',title:'F1 LIVE',type:'additional',default:true},{id:'1025',title:'INTERNATIONAL',type:'additional'},{id:'1003',title:'TRACKER',type:'additional'},{id:'1004',title:'DATA',type:'additional'},{id:'1016',title:'NOR',type:'obc'}];
 function piece(name,next){const at=source.indexOf('  function '+name+'('),end=source.indexOf('  function '+next+'(',at+1);assert.ok(at>=0&&end>at);return source.slice(at,end);}
 const flush=()=>new Promise(resolve=>setImmediate(resolve));
-function choicesContext({cached=true,failed=false}={}){
-  let dialog,changed,requests=0;const c={I18n:{setText(element,value){element.textContent=value;}},Views,Drivers,epoch:4,current:{tab:'home'},playing:true,viewBusy:false,seekBusy:false,activePlayback:{item:{id:'42',title:'Race',live:true},channelId:'1025',channelTitle:'International',audioTrackId:'set:en',audioTracks:[{id:'set:en',label:'Anglų',language:'eng'},{id:'set:fr',label:'Prancūzų',language:'fra'}]},catalogueCache:{get:()=>cached?{items:channels}:null,put(){}},driverStore:{observe(){}},document:{getElementById:()=>({})},updateViewControls(){},showOverlay(){},chooseFavoriteDriver(){},request(route){requests++;assert.equal(route,'/api/channels?id=42');return failed?Promise.reject(Error('network')):Promise.resolve({channels});},dialog(...args){dialog=args;},changeView(options){changed=options;}};
-  vm.createContext(c);vm.runInContext(piece('selectCamera','selectAudio')+piece('selectAudio','selectQuality'),c);return{c,get dialog(){return dialog;},get changed(){return changed;},get requests(){return requests;}};
+function choicesContext({cached=true,failed=false,play=null,tracks=null}={}){
+  let dialog,changed,playBody,requests=0;const c={I18n:{setText(element,value){element.textContent=value;}},Views,Drivers,epoch:4,current:{tab:'home'},playing:true,viewBusy:false,seekBusy:false,activePlayback:{item:{id:'42',title:'Race',live:true},channelId:'1025',channelTitle:'International',audioTrackId:'set:en',audioTracks:tracks||[{id:'set:en',label:'Anglų',language:'eng'},{id:'set:fr',label:'Prancūzų',language:'fra'}]},catalogueCache:{get:()=>cached?{items:channels}:null,put(){}},driverStore:{observe(){}},document:{hidden:false,getElementById:()=>({})},updateViewControls(){},showOverlay(){},chooseFavoriteDriver(){},request(route,method,body){if(route==='/api/play'){playBody=body;return Promise.resolve(play);}requests++;assert.equal(route,'/api/channels?id=42');return failed?Promise.reject(Error('network')):Promise.resolve({channels});},dialog(...args){dialog=args;c.modal={};},changeView(options){changed=options;}};
+  vm.createContext(c);vm.runInContext(piece('streamAudioChoices','prepareViewPlayback')+piece('selectCamera','selectAudio')+piece('selectAudio','selectQuality'),c);return{c,get dialog(){return dialog;},get changed(){return changed;},get requests(){return requests;},get playBody(){return playBody;}};
 }
 test('commentary streams stay out of POV choices without inventing or changing provider IDs',()=>{
   assert.deepEqual(Views.commentaryChannels({channels}).map(c=>[c.id,c.title]),[['1033','F1 Live'],['1025','International']]);
@@ -23,7 +23,7 @@ test('commentary streams stay out of POV choices without inventing or changing p
 });
 test('audio dialog includes F1 Live and International, switches the authorized stream and keeps language choices',async()=>{
   const p=choicesContext();p.c.selectAudio();await flush();assert.equal(p.requests,0);
-  const labels=p.dialog[2].map(c=>c.label);assert.ok(labels.includes('F1 Live'));assert.ok(labels.includes('✓ Anglų · International'));assert.equal(labels.includes('✓ Anglų'),false);assert.ok(labels.includes('Prancūzų'));assert.equal(labels.includes('TRACKER'),false);
+  const labels=p.dialog[2].map(c=>c.label);assert.ok(labels.includes('F1 Live'));assert.ok(labels.includes('✓ Anglų · International'));assert.equal(labels.includes('✓ Anglų'),false);assert.ok(labels.includes('Kalbos…'));assert.equal(labels.includes('Prancūzų'),false);assert.equal(labels.includes('TRACKER'),false);
   p.dialog[2].find(c=>c.label==='F1 Live').run();assert.deepEqual(JSON.parse(JSON.stringify(p.changed)),{channelId:'1033',channelTitle:'F1 Live',audioLanguage:'eng',commentary:true});
 });
 test('camera dialog keeps actual driver POV, tracker and data, with commentary only behind return to main picture',async()=>{
@@ -58,16 +58,33 @@ test('explicit manual International and POV selections are preserved without a n
 });
 test('F1 Live has one selected audio choice; English International remains a manual action',async()=>{
   const p=choicesContext();p.c.activePlayback.channelId='1033';p.c.activePlayback.channelTitle='F1 Live';p.c.selectAudio();await flush();const labels=p.dialog[2].map(c=>c.label);
-  assert.ok(labels.includes('✓ F1 Live'));assert.ok(labels.includes('Anglų · International'));assert.equal(labels.filter(x=>x.startsWith('✓ ')).length,1);assert.equal(labels.includes('Prancūzų'),false);
+  assert.ok(labels.includes('✓ F1 Live'));assert.ok(labels.includes('Anglų · International'));assert.equal(labels.filter(x=>x.startsWith('✓ ')).length,1);assert.ok(labels.includes('Kalbos…'),'other languages sit behind one Languages entry');assert.equal(labels.includes('Prancūzų'),false);assert.equal(labels.includes('Anglų'),false);
   p.dialog[2].find(c=>c.label==='Anglų · International').run();assert.deepEqual(JSON.parse(JSON.stringify(p.changed)),{channelId:'1025',channelTitle:'International',audioLanguage:'eng',commentary:true});
 });
-function startup(){
-  let resolve,reject,starts=0;const catalogue=new Promise((yes,no)=>{resolve=yes;reject=no;}),requests=[],main={appendChild(){}},status={setAttribute(){},remove(){}},c={Views,UX:{item:raw=>raw,resume:()=>0},Quality:{mode:value=>value},preferredQuality:'best',preferredAudioLanguage:'spa',account:{signedIn:true},current:{tab:'home'},liveTimer:0,pendingRequest:0,playbackHealth:{reset(){}},root:{querySelector:selector=>selector==='main'?main:null},document:{hidden:false,contains:element=>element===main},catalogueCache:{get:()=>null,put(){}},localStore:{get:()=>null},cancelRecovery(){},rememberView(){},clearInterval(){},node:()=>status,request(route,method,body){requests.push({route,body});return route.startsWith('/api/channels')?catalogue:Promise.resolve({channelId:body.channelId,audioTrackId:'set:en'});},prepareViewPlayback(item,stream,compatibility,resume,options){return{item,stream,...options};},viewTitle:state=>state.item.title,begin(){starts++;},updateViewControls(){},tryRecovery(){throw Error('Unexpected playback failure');},error(){throw Error('Unexpected UI failure');}};
+test('Languages submenu lists the current stream\'s other languages and selects one directly',async()=>{
+  const p=choicesContext();p.c.selectAudio();await flush();p.dialog[2].find(c=>c.label==='Kalbos…').run();
+  assert.equal(p.dialog[0],'Kalbos');assert.deepEqual(Array.from(p.dialog[2],c=>c.label),['Grįžti','Prancūzų']);assert.equal(p.requests,0);
+  p.dialog[2].find(c=>c.label==='Prancūzų').run();assert.deepEqual(JSON.parse(JSON.stringify(p.changed)),{audioTrackId:'set:fr',commentary:true});
+});
+test('from F1 Live the Languages submenu reads International\'s tracks and switches feed and language in one step',async()=>{
+  const play={audioTracks:[{id:'set:en',language:'eng',label:'Anglų'},{id:'set:pt',language:'pt-BR',label:'Portugalų (Brazilija)'},{id:'set:ja',language:'jpn',label:'Japonų'}]};
+  const p=choicesContext({play,tracks:[{id:'set:en',label:'Anglų',language:'eng'}]});p.c.activePlayback.channelId='1033';p.c.activePlayback.channelTitle='F1 Live';
+  p.c.selectAudio();await flush();p.dialog[2].find(c=>c.label==='Kalbos…').run();await flush();
+  assert.deepEqual(JSON.parse(JSON.stringify(p.playBody)),{id:'42',channelId:'1025',audioTrackId:'',audioLanguage:'eng'});
+  assert.deepEqual(Array.from(p.dialog[2],c=>c.label),['Grįžti','Portugalų (Brazilija)','Japonų']);
+  p.dialog[2].find(c=>c.label==='Portugalų (Brazilija)').run();assert.deepEqual(JSON.parse(JSON.stringify(p.changed)),{channelId:'1025',channelTitle:'International',audioLanguage:'pt-br',commentary:true});
+});
+function startup(preferredCommentary=''){
+  let resolve,reject,starts=0;const catalogue=new Promise((yes,no)=>{resolve=yes;reject=no;}),requests=[],main={appendChild(){}},status={setAttribute(){},remove(){}},c={Views,UX:{item:raw=>raw,resume:()=>0},Quality:{mode:value=>value},preferredQuality:'best',preferredAudioLanguage:'spa',preferredCommentary,account:{signedIn:true},current:{tab:'home'},liveTimer:0,pendingRequest:0,playbackHealth:{reset(){}},root:{querySelector:selector=>selector==='main'?main:null},document:{hidden:false,contains:element=>element===main},catalogueCache:{get:()=>null,put(){}},localStore:{get:()=>null},cancelRecovery(){},rememberView(){},clearInterval(){},node:()=>status,request(route,method,body){requests.push({route,body});return route.startsWith('/api/channels')?catalogue:Promise.resolve({channelId:body.channelId,audioTrackId:'set:en'});},prepareViewPlayback(item,stream,compatibility,resume,options){return{item,stream,...options};},viewTitle:state=>state.item.title,begin(){starts++;},updateViewControls(){},tryRecovery(){throw Error('Unexpected playback failure');},error(){throw Error('Unexpected UI failure');}};
   vm.createContext(c);vm.runInContext(piece('resolveStartView','startContent')+piece('startContent','firstMenuContent'),c);return{c,requests,resolve,reject,get starts(){return starts;}};
 }
 test('starting a new main session requests service-supplied F1 Live and English within that feed',async()=>{
   const p=startup();p.c.startContent({id:'42',title:'Race',live:true});p.resolve({channels:[{id:'77',title:'INTERNATIONAL',default:true},{id:'88',title:'F1 LIVE'}]});await flush();
   const play=p.requests.find(r=>r.route==='/api/play');assert.equal(play.body.channelId,'88');assert.equal(play.body.audioLanguage,'eng');assert.equal(p.c.activePlayback.channelTitle,'F1 Live');assert.equal(p.starts,1);
+});
+test('a remembered International choice starts in International with the saved language, falling back to English in the feed',async()=>{
+  const p=startup('International');p.c.startContent({id:'42',title:'Race',live:true});p.resolve({channels:[{id:'77',title:'INTERNATIONAL',default:true},{id:'88',title:'F1 LIVE'}]});await flush();
+  const play=p.requests.find(r=>r.route==='/api/play');assert.equal(play.body.channelId,'77');assert.equal(play.body.audioLanguage,'spa');assert.equal(p.c.activePlayback.channelTitle,'International');
 });
 test('navigating away or suspending the app during commentary lookup does not request playback',async()=>{
   for(const canceled of ['navigation','suspended']){const p=startup();p.c.startContent({id:'42',title:'Race',live:true});if(canceled==='navigation')p.c.pendingRequest++;else p.c.document.hidden=true;p.resolve({channels});await flush();assert.equal(p.requests.filter(r=>r.route==='/api/play').length,0);assert.equal(p.starts,0);}
@@ -77,4 +94,16 @@ test('a missing commentary catalogue preserves normal provider playback and does
 });
 test('the F1 Live player label identifies commentary rather than showing a second English selection',()=>{
   const p=player(source);p.c.activePlayback.channelTitle='F1 Live';p.c.updateViewControls();assert.equal(p.ids['player-audio'].textContent,'Garsas: F1 Live');
+});
+
+test('late International language responses do not reopen a canceled, hidden or stale screen',async()=>{
+ for(const reason of ['back','navigation','suspend','playback']){
+  let resolve;const pending=new Promise(done=>{resolve=done;});const p=choicesContext({play:pending,tracks:[{id:'set:en',language:'eng',label:'English'}]});p.c.activePlayback.channelId='1033';p.c.activePlayback.channelTitle='F1 Live';p.c.selectAudio();await flush();p.dialog[2].find(c=>c.label==='Kalbos…').run();const loading=p.dialog;
+  assert.equal(p.c.viewBusy,false,'loading languages must not lock player controls');
+  if(reason==='back')p.c.modal=null;if(reason==='navigation')p.c.current={tab:'home'};if(reason==='suspend')p.c.document.hidden=true;if(reason==='playback')p.c.epoch++;
+  resolve({audioTracks:[{id:'set:pt',language:'pt',label:'Portuguese'}]});await flush();assert.equal(p.dialog,loading,reason);
+ }
+});
+test('F1 Live does not reuse another feed audio IDs when listing International languages',async()=>{
+ const p=choicesContext({play:{audioTracks:[{id:'set:intl-fr',language:'fr',label:'French'}]}});p.c.activePlayback.channelId='1033';p.c.activePlayback.channelTitle='F1 Live';p.c.selectAudio();await flush();p.dialog[2].find(c=>c.label==='Kalbos…').run();await flush();assert.equal(p.playBody.channelId,'1025');p.dialog[2].find(c=>c.label==='French').run();assert.equal(p.changed.channelId,'1025');assert.equal(p.changed.audioLanguage,'fr');
 });

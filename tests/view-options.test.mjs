@@ -87,3 +87,11 @@ test('companion camera route requires pairing and play selects an available lang
   const result=await send('/api/play',{id:'42',channelId:'12',audioTrackId:'set:fr',videoQuality:'720p',relay:true});assert.equal(result.status,200);assert.equal(result.data.videoQuality,'720p');assert.equal(result.data.selectedVideo.height,720);assert.equal(result.data.audioTrackId,'set:fr');assert.equal(result.data.channelId,'12');assert.equal(calls[0][3],'12');assert.ok(!result.text.includes('private-account-fixture'));
   const bad=await send('/api/play',{id:'42',channelId:'12',audioTrackId:'set:unknown',relay:true});assert.notEqual(bad.status,200);
 });
+
+test('Portuguese variants and Japanese get names; saved language matches across ISO code styles',()=>{
+  const xml='<MPD>'+audio('en','eng')+audio('pt','pt-BR')+audio('ja','jpn')+audio('nl','nld')+'</MPD>';
+  assert.deepEqual(Views.audioTracks(xml).map(t=>t.label),['Anglų','Portugalų (Brazilija)','Japonų','Nyderlandų']);
+  assert.equal(Views.languageName('por'),'Portugalų');
+  assert.equal(Views.selectAudio(xml,'','por').id,'set:pt');assert.equal(Views.selectAudio(xml,'','pt-br').id,'set:pt');
+  assert.equal(Views.selectAudio(xml,'','ja').id,'set:ja');assert.equal(Views.selectAudio(xml,'','lit').id,'set:en');
+});
