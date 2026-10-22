@@ -49,6 +49,7 @@
   "Anglų": "English",
   "Kalbos…": "Languages…",
   "Kalbos": "Languages",
+  "Gaunamos F1 kalbos…": "Loading F1 languages…",
   "Pasirink komentatorių kalbą. Pakeitimas gali užtrukti kelias sekundes.": "Choose a commentary language. Changing it can take a few seconds.",
   "F1 šiam įrašui kitų kalbų nepateikė.": "F1 does not offer other languages for this recording.",
   "Kalbų sąrašo gauti nepavyko.": "Could not load the language list.",

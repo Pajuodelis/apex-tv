@@ -833,7 +833,7 @@ window.ApexProtectionProbe = {
     if (account && account.signedIn) {
       var summary = node('div', '', 'account-summary'), copy = node('div'); copy.appendChild(node('h2', 'F1 TV paskyra'));
       copy.appendChild(node('p', 'Prisijungta · ' + account.country)); summary.appendChild(copy);
-      summary.appendChild(focusKey(button('Atsijungti', function () { dialog('Atsijungti nuo F1 TV?','Šiame TV bus pašalinta F1 sesija, žiūrėjimo istorija ir mėgstami įrašai.',[{label:'Atšaukti',default:true},{label:'Atsijungti',run:function(){window.ApexStandalone.signOut().then(function(){localStore.clearAccount();setupStore.clearAccount();setupCatalogue={status:"untested"};catalogueCache.clear();editorialCache={};editorialPending={};driverStore.clear();weekendData=null;preferredAudioLanguage="";try{localStorage.removeItem("apex-audio-language");}catch(_){}stack=[];refreshAccount();}).catch(function(e){error(root.querySelector('main'),e.message);});}}]); }, 'secondary-button'), 'account-signout')); box.appendChild(summary);
+      summary.appendChild(focusKey(button('Atsijungti', function () { dialog('Atsijungti nuo F1 TV?','Šiame TV bus pašalinta F1 sesija, žiūrėjimo istorija ir mėgstami įrašai.',[{label:'Atšaukti',default:true},{label:'Atsijungti',run:function(){window.ApexStandalone.signOut().then(function(){localStore.clearAccount();setupStore.clearAccount();setupCatalogue={status:"untested"};catalogueCache.clear();editorialCache={};editorialPending={};driverStore.clear();weekendData=null;preferredAudioLanguage="";preferredCommentary="";try{localStorage.removeItem("apex-audio-language");localStorage.removeItem("apex-commentary");}catch(_){}stack=[];refreshAccount();}).catch(function(e){error(root.querySelector('main'),e.message);});}}]); }, 'secondary-button'), 'account-signout')); box.appendChild(summary);
     } else {
       box.classList.add('login-panel');
       var mark=node('div','F1','login-mark');mark.setAttribute('aria-hidden','true');box.appendChild(mark);
@@ -1440,22 +1440,23 @@ window.ApexProtectionProbe = {
       if(generation!==epoch||current!==view||state!==activePlayback)return;viewBusy=false;updateViewControls();
       var channels=Views.channels(data);if(!message)catalogueCache.put(route,channels);
       var commentaries=Views.commentaryChannels({channels:channels}),choices=[{label:'Grįžti',default:true}],chosen=state.audioTracks.filter(function(track){return track.id===state.audioTrackId;})[0];
-      commentaries.forEach(function(channel){var selected=(state.channelId===channel.id||!state.channelId&&channel.default)&&(!chosen||/^(eng|en)$/.test(chosen.language));
+      commentaries.forEach(function(channel){var selected=(state.channelId===channel.id||!state.channelId&&channel.default)&&(!chosen||Views.family(chosen.language)==='en');
         choices.push({label:(selected?'✓ ':'')+(channel.title==='International'?'Anglų · International':channel.title),run:function(){if(!selected)changeView({channelId:channel.id,channelTitle:channel.title,audioLanguage:'eng',commentary:true});}});
       });
-      var intl=commentaries.filter(function(channel){return channel.title==='International';})[0],others=state.audioTracks.filter(function(track){return !/^(eng|en)$/.test(track.language);});
+      var intl=commentaries.filter(function(channel){return channel.title==='International';})[0],others=state.audioTracks.filter(function(track){return Views.family(track.language)!=='en';});
       function languageMenu(tracks,pick){var list=[{label:'Grįžti',default:true,run:selectAudio}];tracks.forEach(function(track){list.push({label:(track.id===state.audioTrackId?'✓ ':'')+track.label,run:function(){pick(track);}});});dialog('Kalbos','Pasirink komentatorių kalbą. Pakeitimas gali užtrukti kelias sekundes.',list);}
-      function pickHere(track){if(track.id!==state.audioTrackId)changeView({audioTrackId:track.id});}
+      function pickHere(track){if(track.id!==state.audioTrackId)changeView(Object.assign({audioTrackId:track.id},Views.commentaryTitle(state.channelTitle)==='International'?{commentary:true}:{}));}
       function pickInternational(track){changeView({channelId:intl.id,channelTitle:intl.title,audioLanguage:track.language,commentary:true});}
       // F1 Live carries English only; other languages ride on International. Read them from the current stream when present, otherwise ask the service for International's tracks.
       function openLanguages(){
-        if(others.length)return languageMenu(others,pickHere);
-        viewBusy=true;updateViewControls();showOverlay();
+        if(others.length&&(!intl||state.channelId===intl.id))return languageMenu(others,pickHere);
+        dialog('Kalbos','Gaunamos F1 kalbos…',[{label:'Grįžti',default:true,run:selectAudio}]);var loadingDialog=modal;
+        function stillWaiting(){return generation===epoch&&current===view&&activePlayback===state&&!document.hidden&&modal===loadingDialog;}
         request('/api/play','POST',{id:state.item.id,channelId:intl.id,audioTrackId:'',audioLanguage:'eng'}).then(function(stream){
-          if(generation!==epoch||activePlayback!==state)return;viewBusy=false;updateViewControls();
-          var found=streamAudioChoices(stream).filter(function(track){return !/^(eng|en)$/.test(track.language);});
+          if(!stillWaiting())return;
+          var found=streamAudioChoices(stream).filter(function(track){return Views.family(track.language)!=='en';});
           if(found.length)languageMenu(found,pickInternational);else dialog('Kalbos','F1 šiam įrašui kitų kalbų nepateikė.',[{label:'Grįžti',default:true,run:selectAudio}]);
-        }).catch(function(){if(generation!==epoch||activePlayback!==state)return;viewBusy=false;updateViewControls();dialog('Kalbos','Kalbų sąrašo gauti nepavyko.',[{label:'Grįžti',default:true,run:selectAudio},{label:'Bandyti dar kartą',run:openLanguages}]);});
+        }).catch(function(){if(!stillWaiting())return;dialog('Kalbos','Kalbų sąrašo gauti nepavyko.',[{label:'Grįžti',default:true,run:selectAudio},{label:'Bandyti dar kartą',run:openLanguages}]);});
       }
       if(commentaries.length){if(others.length||intl)choices.push({label:'Kalbos…',run:openLanguages});}
       else state.audioTracks.forEach(function(track){choices.push({label:(track.id===state.audioTrackId?'✓ ':'')+track.label,run:function(){if(track.id!==state.audioTrackId)changeView({audioTrackId:track.id});}});});
