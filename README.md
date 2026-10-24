@@ -56,7 +56,7 @@ install it. Once setup is complete, the phone or computer can be switched off.
 
 | Requirement | Details |
 | --- | --- |
-| TV platform | Samsung Tizen 6.0 or later; Tizen 5.0/5.5 (2019–2020) through a Chromium 63 build, see [Tizen 5.x](docs/TIZEN-5.md) |
+| TV platform | Samsung Tizen 5.0 or later (2019+); see [Tizen 5.x notes](docs/TIZEN-5.md) |
 | Account | An eligible F1 TV subscription for the content and region |
 | Network | Internet access on the TV; a device on the same network for installation |
 | Interface languages | English and Lithuanian |
@@ -69,15 +69,17 @@ retrieved its own media and DRM licenses; replay playback was also checked
 with the optional companion server stopped. Version 0.5.11 was tested on this
 TV with retained sign-in, smooth menu navigation, picture and sound.
 
-**Contributor-reported Tizen 5.5 hardware:** Samsung UN43TU7000GXZD (2020). F1 picture and
-sound were confirmed with the in-app setup check using native AVPlay +
-Widevine; a long live session (DRM key rotation) has not been verified yet.
+**Contributor-reported Tizen 5.5 hardware:** Samsung UN43TU7000GXZD (2020).
+The [latest report](https://github.com/Pajuodelis/apex-tv/issues/4) records about
+70 minutes of live FP1 playback, working picture and sound, camera/commentary
+switching, and no companion computer, using an earlier modified 0.5.11 build.
+Version 0.5.12 includes the legacy support in the standard downloadable WGT.
+See [Tizen 5.x details](docs/TIZEN-5.md).
 
 The package now targets Tizen 5.0 or later; this does not guarantee playback on every TV.
-Physical Tizen 9 testing, additional models and regions, long-session stability
-and DRM key rotation remain areas for further validation. The documented
-Apps2Samsung route has not been independently verified end to end on another
-user's television.
+Physical Tizen 5.0 and Tizen 9 testing, additional models and regions, and DRM
+key rotation remain areas for further validation. The new WGT itself has not
+yet been installed and independently confirmed on the contributor's TV.
 
 [Submit a compatibility report](https://github.com/Pajuodelis/apex-tv/issues/new?template=compatibility.yml)
 with your model, Tizen version and playback results.

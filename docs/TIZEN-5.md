@@ -6,6 +6,10 @@ Samsung documents **Tizen 5.0 (2019)** as **Chromium 63** and **Tizen 5.5 (2020)
 **Chromium 69**. The TV package targets `chrome63`, the lower of the two, so one `.wgt`
 serves both.
 
+Version **0.5.12** includes this support in the standard downloadable
+[Apex-TV.wgt](https://github.com/Pajuodelis/apex-tv/releases/latest/download/Apex-TV.wgt).
+A separate fork or custom build is no longer needed to install on Tizen 5.x.
+
 ## Contributor-reported device test
 
 | Field | Value |
@@ -21,8 +25,15 @@ serves both.
 Tizen 5.0 (2019) has not been tested on a real TV yet.
 
 This report describes the contributor’s build, not a fresh test of later integration changes.
-Replay versus live content was not recorded. Tizen 6+ also requires regression testing
-after integration; automated checks alone do not prove playback.
+Replay versus live content was not recorded. The integrated playback code was subsequently checked on Samsung UE55AU7092 /
+Tizen 6: F1 Live and Portuguese International picture and sound were confirmed.
+Restart persistence remains untested. Automated checks do not prove playback
+on every model.
+
+A [later contributor report](https://github.com/Pajuodelis/apex-tv/issues/4) records
+about 70 minutes of genuinely live FP1 on 2026-10-23 without interruption,
+with camera/commentary switching and no companion. It used an earlier modified
+0.5.11 build, not the new public 0.5.12 WGT; DRM key rotation is still unverified.
 
 ## What changed
 

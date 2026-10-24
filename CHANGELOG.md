@@ -1,11 +1,12 @@
 # Changelog
 
-## Unreleased
+## 0.5.12 — 2026-10-24
 
 - Add an International commentary language submenu, saved manual feed/language choices, and consistent language-code matching. Cancel stale lookups, clear account preferences on sign-out, and keep audio selections scoped to their feed.
 - Add a Chromium 63-compatible build and guarded runtime helpers for Tizen 5.0/5.5, with a direct AVPlay path on legacy TVs. Preserve the Tizen 6+ worker relay path and include runtime helpers in future signed menu bundles.
-- Contributor-reported Tizen 5.5 playback is documented separately from integration tests. Tizen 5.0 hardware and physical regression testing of the integrated changes remain pending.
-- These changes are source-only until a new release is tested and published. The public 0.5.11 downloads and signed update feed remain unchanged.
+- Tizen 6 regression check on Samsung UE55AU7092: retained sign-in, native TV-local relay playback, F1 Live and Portuguese International commentary confirmed with picture and sound. The language-menu cancellation and cross-feed selection checks passed. Restart persistence remains untested.
+- Contributor report #4 records about 70 minutes of live FP1 playback on Samsung UN43TU7000GXZD / Tizen 5.5, with working camera and commentary switching and no companion computer. This used an earlier modified build; DRM key rotation was not independently confirmed. Tizen 5.0 hardware and Tizen 9 physical playback remain untested.
+- Publish one unsigned WGT for local installer signing, with minimum Tizen version 5.0, plus a signed menu update for existing installations. Older TVs need the new WGT to obtain the compatible shell. Keep the original installer author certificate when updating an existing app.
 
 ## 0.5.11 — 2026-10-15
 

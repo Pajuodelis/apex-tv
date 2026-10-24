@@ -6,7 +6,11 @@ O build mira em `chrome63`, o menor dos dois, e por isso o mesmo `.wgt` serve pa
 
 [English](TIZEN-5.md)
 
-## Dispositivo verificado
+A versão **0.5.12** inclui este suporte no
+[Apex-TV.wgt oficial do projeto](https://github.com/Pajuodelis/apex-tv/releases/latest/download/Apex-TV.wgt).
+Não é necessário compilar um fork para instalar em Tizen 5.x.
+
+## Relato de teste de um colaborador
 
 | Campo | Valor |
 | --- | --- |
@@ -19,6 +23,11 @@ O build mira em `chrome63`, o menor dos dois, e por isso o mesmo `.wgt` serve pa
 | Não verificado | Registro da licença F1 comum e renovação da licença DRM numa transmissão ao vivo longa (por exemplo, um GP inteiro) |
 
 O Tizen 5.0 (2019) ainda não foi testado em uma TV real.
+
+O [relato posterior #4](https://github.com/Pajuodelis/apex-tv/issues/4) registra
+aproximadamente 70 minutos de FP1 ao vivo em 2026-10-23, com imagem, som, troca
+de câmeras e comentários, sem computador. Foi usado um build 0.5.11 modificado,
+não o novo WGT público 0.5.12. A rotação de chaves DRM continua sem confirmação.
 
 ## O que foi alterado
 

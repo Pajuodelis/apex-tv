@@ -2,7 +2,7 @@
 
 [← Grįžti į Apex TV](README.md) · [Installation in English](INSTALL.md)
 
-Reikia Samsung televizoriaus su Tizen 6.0 arba naujesne versija, interneto,
+Reikia Samsung televizoriaus su Tizen 5.0 arba naujesne versija, interneto,
 savo F1 TV prenumeratos ir vienam įrašymui Android telefono arba kompiuterio.
 Telefonas / kompiuteris turi būti tame pačiame tinkle kaip televizorius.
 
@@ -89,8 +89,11 @@ USB įrašymas paprastame Samsung Tizen TV nebepalaikomas. Vien nukopijuoti
 - **F1 403:** patikrink savo prisijungimą, prenumeratą, regioną ir kitus
   naudojamus ekranus. Programėlė šių F1 ribojimų neapeina.
 
-Šis bendruomenės leidimas patikrintas Samsung UE55AU7092 / Tizen 6.0.
-Kiti TV ir naujasis diegimas per Apps2Samsung dar laukia vartotojų bandymų.
+Atkūrimas patikrintas Samsung UE55AU7092 / Tizen 6.0. Bendruomenės narys
+pranešė apie maždaug 70 minučių veikusią tiesioginę transliaciją
+UN43TU7000GXZD / Tizen 5.5, įdiegęs modifikuotą ankstesnį paketą per Apps2Samsung.
+Tizen 5.0 fiziniame televizoriuje dar neišbandyta; suderinamumas su visais
+modeliais negarantuojamas. [Senesnių TV informacija](docs/TIZEN-5.md).
 
 [Pranešti apie klaidą](https://github.com/Pajuodelis/apex-tv/issues/new?template=bug-report.yml)
 · [Pasidalinti TV bandymo rezultatu](https://github.com/Pajuodelis/apex-tv/issues/new?template=compatibility.yml)

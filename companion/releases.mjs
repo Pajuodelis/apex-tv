@@ -29,7 +29,7 @@ export class Releases {
     if (this.current?.revision === revision) return this.current;
     const files = names.map((name, i) => ({ name, path: '/release/' + revision + '/' + name,
       integrity: 'sha256-' + crypto.createHash('sha256').update(content[i]).digest('base64') }));
-    const payload = Buffer.from(JSON.stringify({ revision, version: '0.5.11', shell: 1, builtAt: Date.now(), files }), 'utf8').toString('base64');
+    const payload = Buffer.from(JSON.stringify({ revision, version: '0.5.12', shell: 1, builtAt: Date.now(), files }), 'utf8').toString('base64');
     const signature = crypto.sign('RSA-SHA256', Buffer.from(payload, 'base64'), this.privateKey).toString('base64');
     const release = { revision, manifest: { payload, signature }, files: new Map(names.map((name, i) => [name, content[i]])) };
     this.releases.set(revision, release); this.current = release;

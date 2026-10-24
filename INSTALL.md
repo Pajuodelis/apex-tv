@@ -4,8 +4,10 @@
 
 ## Before you start
 
-- Samsung television running **Tizen 6.0 or later**. Playback is currently
-  verified on UE55AU7092; other models need testing.
+- Samsung television running **Tizen 5.0 or later**. Maintainer playback checks
+  cover UE55AU7092 / Tizen 6.0; a contributor reports working live playback
+  on UN43TU7000GXZD / Tizen 5.5. Tizen 5.0 hardware remains untested.
+  See [legacy TV details](docs/TIZEN-5.md).
 - Your own F1 TV subscription with access to the content in your region.
 - Internet access and an Android phone or Windows, macOS or Linux computer
   on the **same local network** as the television.
