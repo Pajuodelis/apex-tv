@@ -112,8 +112,17 @@
     return result;
   }
   function probe(diagnostic) {
+    diagnostic=typeof diagnostic==='function'?diagnostic:function(){};
     var relay;
     return open(function(path){if(path!=='/probe')throw Object.assign(Error('Not found'),{status:404});return {bytes:new TextEncoder().encode('apex-tv-loopback'),contentType:'text/plain'};},diagnostic).then(function(server){relay=server;return new Promise(function(resolve,reject){var q=new XMLHttpRequest();q.open('GET',server.url+'/probe');q.timeout=4000;q.onload=function(){if(q.status===200&&q.responseText==='apex-tv-loopback')resolve(true);else reject(Error('TV vietinio ryšio atsakymas netinkamas.'));};q.onerror=q.ontimeout=function(){reject(Error('TV nepasiekė vietinio grotuvo ryšio.'));};q.send();});}).then(function(){relay.stop();diagnostic('tv_socket_probe',{engine:'127.0.0.1 HTTP worker; independent of PC; received exact response'});return true;},function(e){if(relay)relay.stop();diagnostic('tv_socket_probe_failed',{error:e.message});return false;});
   }
-  global.ApexNativeRelay={open:open,probe:probe};
+  var supportCheck=null;
+  function supported(diagnostic) {
+    if(typeof BigInt!=='function'||typeof Worker!=='function'||typeof XMLHttpRequest!=='function')return Promise.resolve(false);
+    // The main window does not expose every API available inside a Samsung worker.
+    // Cache one bounded, exact HTTP round-trip test per app load, including failures.
+    if(!supportCheck)supportCheck=probe(diagnostic).then(function(ok){return ok===true;},function(){return false;});
+    return supportCheck;
+  }
+  global.ApexNativeRelay={open:open,probe:probe,supported:supported};
 }(typeof window!=='undefined'?window:globalThis));

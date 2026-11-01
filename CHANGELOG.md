@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.5.13 — 2026-11-02
+
+- Fix #5: determine TV-local relay support using the existing worker and an exact loopback HTTP round trip, rather than excluding every Tizen 5.x TV. The bounded check is cached once per app load; failed or unavailable probes keep the existing direct/native or user-selected compatibility path.
+- On eligible Tizen 5.x TVs, use the reporter-tested conservative relay profile: up to 720p AVC, STARTBITRATE=LOWEST and EME_WIDEVINE_CDM, with the existing explicit unsupported-API fallback. Tizen 6+ quality selection is unchanged. An earlier explicit compatibility-player choice is preserved; select Try Samsung AVPlay on the error screen to use automatic worker probing.
+- Canceling playback during probing or relay preparation cannot start a stale stream. Probe workers and object URLs are released after success and failure. F1 authorization and CDM challenge/license bytes are unchanged.
+- The Q95T report describes human-confirmed playback and about 30 minutes with a locally modified WGT. It does not establish physical validation of this exact 0.5.13 package, other TV models, full-race endurance or DRM key rotation.
+
 ## 0.5.12 — 2026-10-24
 
 - Add an International commentary language submenu, saved manual feed/language choices, and consistent language-code matching. Cancel stale lookups, clear account preferences on sign-out, and keep audio selections scoped to their feed.

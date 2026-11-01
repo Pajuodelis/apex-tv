@@ -76,6 +76,12 @@ switching, and no companion computer, using an earlier modified 0.5.11 build.
 Version 0.5.12 includes the legacy support in the standard downloadable WGT.
 See [Tizen 5.x details](docs/TIZEN-5.md).
 
+A [Q95T / Tizen 5.5 report](https://github.com/Pajuodelis/apex-tv/issues/5) also
+confirms playback with a locally modified worker-relay build. Version 0.5.13
+adds an actual worker HTTP capability check and a conservative up-to-720p relay
+profile for eligible older TVs. This exact release has not yet been physically
+confirmed on that Q95T; the report is not a guarantee for every Tizen 5.5 model.
+
 The package now targets Tizen 5.0 or later; this does not guarantee playback on every TV.
 Physical Tizen 5.0 and Tizen 9 testing, additional models and regions, and DRM
 key rotation remain areas for further validation. The new WGT itself has not

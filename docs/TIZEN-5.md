@@ -35,6 +35,21 @@ about 70 minutes of genuinely live FP1 on 2026-10-23 without interruption,
 with camera/commentary switching and no companion. It used an earlier modified
 0.5.11 build, not the new public 0.5.12 WGT; DRM key rotation is still unverified.
 
+## Samsung Q95T and worker-only sockets
+
+[Report #5](https://github.com/Pajuodelis/apex-tv/issues/5) describes a Q95T with
+Tizen 5.5 where direct AVPlay rejected F1 Live and MSE/EME produced distorted
+video. The worker HTTP probe succeeded even though SocketsManager was absent
+from the main window. A locally modified WGT using the TV relay, 720p, a low
+startup bitrate and EME Widevine produced human-confirmed picture and sound,
+with about 30 minutes of reported viewing and no PC media relay.
+
+Version 0.5.13 applies capability-based routing and the conservative profile.
+This exact release has not been physically verified on that Q95T. Full-race
+endurance and DRM key rotation remain unverified. If the compatibility player
+was explicitly selected earlier, use **Try Samsung AVPlay** on the error screen
+to enable the new automatic worker check.
+
 ## What changed
 
 | Area | Change |
@@ -43,7 +58,7 @@ with camera/commentary switching and no companion. It used an earlier modified
 | Source | `web/f1-browser.js`: `catch {` → `catch (_unused) {` (the syntax error behind the black screen). |
 | Polyfills | `tv/legacy-polyfills.js`, loaded in `index.html` before `boot.js`: `globalThis`, `String.prototype.matchAll/replaceAll/trimStart/trimEnd/at`, `Array.prototype.flat/flatMap/at`, `Object.fromEntries/hasOwn`, `Promise.prototype.finally`, `Promise.allSettled`, `queueMicrotask`, `AbortController`/`AbortSignal` (+ caller-side fetch rejection on abort; the underlying request may continue) and `AbortSignal.timeout`. Each polyfill is installed only when the native API is missing. |
 | CSS | Flexbox `gap` arrived in Chromium 84. The polyfill sets `<html class="no-flexgap">` and `tv.css` falls back to margins. The compatibility grid also declares `grid-gap`. |
-| Player (AVPlay) | The TV-local relay (`tizentvwasm` sockets + `BigInt`) exists only on Tizen 6+. On Tizen 5.x the app opens the F1 DASH URL directly in `webapis.avplay` with Widevine. If playback fails, the error screen offers **Try compatibility player** (dash.js + MSE/EME with the CBCS audio fix). The choice is stored in `localStorage['apex-legacy-engine']`, and the same button switches back to AVPlay. Tizen 6+ behaviour is unchanged. |
+| Player (AVPlay) | From 0.5.13, test real worker loopback HTTP capabilities when BigInt is available. A successful probe enables the TV-local relay even without main-window SocketsManager; failures retain direct AVPlay. On Tizen 5.x, the relay uses up to 720p and a low startup bitrate with EME_WIDEVINE_CDM. A saved manual browser-player choice is respected. The normal Tizen 6+ quality profile is unchanged. |
 | Checks | `setup-checks.js` accepts Tizen 5.x. The new `tools/check-legacy.mjs` (run by `npm run build:tv`) fails the build if any script in the `.wgt` does not parse as Chromium 63 JavaScript. |
 | config.xml | `required_version="5.0"`. |
 | Online updates | Still enabled by default. Because `Releases.publish()` lowers the menu before signing, updates stay compatible with Tizen 5.x. A fork can set `"onlineUpdates": false` in `tv/connection.js` to ship a frozen menu. |
@@ -72,7 +87,7 @@ The unsigned package is written to `dist/Apex-TV.wgt`; install it with Apps2Sams
 ## Known limitations
 
 - Chromium 63 has no `focus({preventScroll})`. Focus works, but scrolling may jump slightly while navigating.
-- A long live session has not been confirmed yet; DRM licence renewal happens there. If video stops
-  after 30–60 minutes with a DRM error, that is the likely cause.
+- The 70-minute UN43TU7000 and 30-minute Q95T reports do not establish full-race
+  endurance or independent DRM key-rotation coverage on this release.
 - Direct AVPlay playback does not get the timestamp and CBCS audio corrections of the Tizen 6 relay.
   They were not needed on the UN43TU7000; on other models, use the compatibility player if picture or sound misbehave.

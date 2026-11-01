@@ -186,13 +186,15 @@ window.ApexProtectionProbe = {
   var stack = [], current = { tab: 'home', title: 'Pradžia' }, account = null;
   var pendingRequest = 0, playing = false, epoch = 0, playbackKind = '', hideTimer = 0, overlayDismissed = false, tracks = [];
   var nativePlayer = window.webapis && webapis.avplay;
-  // Tizen 5.0/5.5 (2019/2020): no tizentvwasm sockets and no Elementary Media; AVPlay plays the F1 DASH URL directly.
   var legacyTizen = /Tizen[\/ ]5\.[05](?:\D|$)/i.test(navigator.userAgent);
-  // Socket capabilities are checked inside the worker; they need not exist on window.
-  var localRelaySupported = !legacyTizen && typeof BigInt === 'function';
+  // Eligibility only: the worker must still pass an actual loopback HTTP probe.
+  var localRelayEligible = typeof BigInt === 'function' && Boolean(window.ApexNativeRelay && typeof window.ApexNativeRelay.supported === 'function');
   // Tizen 5.x engine: 'avplay' (default, Samsung native + Widevine) or 'browser' (dash.js + MSE/EME with the CBCS audio fix).
   function legacyEngine(){try{return localStorage.getItem('apex-legacy-engine')==='browser'?'browser':'avplay';}catch(_){return 'avplay';}}
   function setLegacyEngine(value){try{localStorage.setItem('apex-legacy-engine',value==='browser'?'browser':'avplay');}catch(_){}}
+  function relayInput(stream){return legacyTizen?Object.assign({},stream,{videoQuality:'720p'}):stream;}
+  function nativeAdaptiveInfo(stream){return legacyTizen&&stream.localTV?'STARTBITRATE=LOWEST|FIXED_MAX_RESOLUTION=1280X720':'STARTBITRATE=HIGHEST|FIXED_MAX_RESOLUTION=1920X1080';}
+  function nativeUsesEme(stream){return stream.platform!=='public-test'&&(/Tizen[\/ ]6\.0(?:\D|$)/i.test(navigator.userAgent)||(legacyTizen&&stream.localTV));}
   var browserPlayer = null, activeEngine = '', prepareTimer = 0, localRelay = null;
   var commandBusy = false, lastCommand = '';
   var renderedView = null, awaitingCatalogFocus = null;
@@ -1224,13 +1226,19 @@ window.ApexProtectionProbe = {
   }
   function begin(stream, title, kind) {
     resetPlayerTimeline(kind);
-    if (ctx.standalone && !ctx.testCompanion && kind !== 'demo' && !stream.localTV && stream.manifestXML && window.ApexTVMedia && nativePlayer && localRelaySupported) {
+    if (ctx.standalone && !ctx.testCompanion && kind !== 'demo' && !stream.localTV && stream.manifestXML && window.ApexTVMedia && nativePlayer && localRelayEligible && !stream.relayUnsupported && (!legacyTizen || legacyEngine() !== 'browser')) {
       if (playing) stopPlayback();
       playing = true; playbackKind = kind; var localGeneration = ++epoch;
       clearInterval(liveTimer);artworkLoader.reset();motion.cancel();root.hidden = true; document.body.classList.add('playing');
       I18n.setText(document.getElementById('player-title'), title);
       I18n.setText(document.getElementById('player-state'), 'Ruošiamas vaizdas…'); showOverlay();
-      window.ApexTVMedia.start(stream, window.ApexStandalone.client, diagnostic).then(function (relay) {
+      window.ApexNativeRelay.supported(diagnostic).then(function(available){
+        if(localGeneration!==epoch)return;
+        if(!available){playing=false;begin(Object.assign({},stream,{relayUnsupported:true}),title,kind);return;}
+        if(legacyTizen)diagnostic('legacy_relay_profile',{engine:'TV worker relay; safe 720p; STARTBITRATE=LOWEST'});
+        return window.ApexTVMedia.start(relayInput(stream),window.ApexStandalone.client,diagnostic);
+      }).then(function (relay) {
+        if(!relay)return;
         if (localGeneration !== epoch) { relay.stop(); return; }
         localRelay = relay; playing = false; if(activePlayback)activePlayback.stream.selectedVideo=relay.video;
         var prepared = Object.assign({}, stream, { manifestUrl: relay.url, selectedVideo:relay.video, localTV: true, relayed: true, browserTest: false, compatibilityStart: false });
@@ -1293,7 +1301,7 @@ window.ApexProtectionProbe = {
       nativePlayer.open(stream.manifestUrl);
       nativePlayer.setDisplayRect(0, 0, 1920, 1080);
       nativePlayer.setDisplayMethod('PLAYER_DISPLAY_MODE_LETTER_BOX');
-      if (kind !== 'demo') nativePlayer.setStreamingProperty('ADAPTIVE_INFO', 'STARTBITRATE=HIGHEST|FIXED_MAX_RESOLUTION=1920X1080');
+      if (kind !== 'demo') nativePlayer.setStreamingProperty('ADAPTIVE_INFO', nativeAdaptiveInfo(stream));
       var nativeBaseline = null, nativeStarted = false, nativePrepared = false, nativeSince = Date.now(), nativeFailing = false, nativeDrmType = 'WIDEVINE_CDM', nativeLicenceCount = 0;
       function nativeFailure(message) {
         if (generation !== epoch || nativeFailing) return;
@@ -1345,7 +1353,7 @@ window.ApexProtectionProbe = {
         var drmProperties = JSON.stringify({ AppSession: 'apex-' + Date.now(), DataType: 'MPEG-DASH' });
         // Samsung's current setDrm example names this alternative for Tizen 5+.
         // Only an explicit unavailable API falls back to the same Widevine DRM.
-        if (stream.platform !== 'public-test' && /Tizen[\/ ]6\.0(?:\D|$)/i.test(navigator.userAgent)) {
+        if (nativeUsesEme(stream)) {
           try {
             var configured = nativePlayer.setDrm('EME_WIDEVINE_CDM', 'SetProperties', drmProperties);
             if (configured === false || configured === 'false' || configured === 'FALSE') throw { name: 'NotSupportedError' };
