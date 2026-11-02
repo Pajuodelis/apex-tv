@@ -68,7 +68,7 @@
     if (/practice|treniruot/.test(name)) return 'practice';
     if (/sprint/.test(name)) return 'sprint';
     if (/qualifying|qualification|kvalifik/.test(name)) return 'qualifying';
-    if (/race|lenktyn/.test(name)) return 'race'; return 'other';
+    if (/race|lenktyn/.test(name) || raw.kind==='video' && (/^race$/i.test(text(raw.subtitle).trim()) || /\bgrand prix\b/.test(name))) return 'race'; return 'other';
   }
   function select(items, query, filter, sort) {
     var tokens = fold(query).trim().split(/\s+/).filter(Boolean);
@@ -90,6 +90,7 @@
     return {
       put: function (key, value) { entries[key] = { items: value.slice(0,100), at: now() }; order = order.filter(function (v) { return v !== key; }); order.push(key); while (order.length>30) delete entries[order.shift()]; },
       get: function (key, ttl) { var v = entries[key]; return v && (ttl === undefined || now()-v.at <= ttl) ? { items: v.items.slice(), at: v.at } : null; },
+      remove: function (key) { delete entries[key]; order = order.filter(function(v){return v!==key;}); },
       clear: function () { entries = {}; order = []; }
     };
   }

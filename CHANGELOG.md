@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.5.14 — 2026-11-02
+
+- Keep the latest completed F1 race visible on Home after the calendar moves to the next Grand Prix. The card comes from the official current/previous meeting catalogue; upcoming sessions, live events, locked recordings and short-form videos are excluded.
+- Recognize full recordings named Grand Prix or labelled Race by F1 in the Race filter, including the 2026 Mexico City Grand Prix.
+- Add Refresh to GP and season catalogues to retrieve newly published recordings without restarting the app. Background latest-race refreshes preserve focused cards and reuse unchanged nodes.
+- Preserve the existing playback, DRM, QR sign-in and legacy worker relay paths. Catalogue checks and automated tests are not a new physical TV playback confirmation.
+
 ## 0.5.13 — 2026-11-02
 
 - Fix #5: determine TV-local relay support using the existing worker and an exact loopback HTTP round trip, rather than excluding every Tizen 5.x TV. The bounded check is cached once per app load; failed or unavailable probes keep the existing direct/native or user-selected compatibility path.
