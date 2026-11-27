@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Issue #6 (partial): always show From beginning on recording details, including unwatched and completed recordings. Add the same action under the recording player More menu using the existing restart path.
+- State the current up-to-1080p / no-4K-HDR limit in playback settings and documentation. Full live start-over and UHD playback remain unresolved.
+- Playback engine, live rewind and service access checks are unchanged.
+
 ## 0.5.14 — 2026-11-02
 
 - Keep the latest completed F1 race visible on Home after the calendar moves to the next Grand Prix. The card comes from the official current/previous meeting catalogue; upcoming sessions, live events, locked recordings and short-form videos are excluded.

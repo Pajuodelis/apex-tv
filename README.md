@@ -173,3 +173,16 @@ not bypass account, region, concurrent-screen or DRM restrictions.
 
 Original code is released under the [MIT license](LICENSE). Dependencies
 retain their own licenses; see [third-party notices](THIRD_PARTY_NOTICES.md).
+
+### Starting recordings over and 4K status
+
+Recordings have an explicit **From beginning** action, even when no saved
+resume position exists. During recorded playback, use **More → From beginning**.
+Live streams retain their existing service-provided rewind window; full live
+start-over is not implemented by this fix.
+
+Apex TV currently selects up to 1080p. The legacy TV-local relay uses its
+conservative up-to-720p profile. **4K/HDR is not implemented**: a 4K TV alone
+does not change this application limit. Future UHD support needs an eligible
+F1-provided stream, compatible HEVC/DRM playback and physical TV validation.
+See [issue #6](https://github.com/Pajuodelis/apex-tv/issues/6).
